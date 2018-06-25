@@ -2,14 +2,13 @@
 -- (c) Alexander Veledzimovich
 -- view ASTEROIDS
 
-local Timer = require('lib/tmr')
+local Tmr = require('lib/tmr')
 local ui = require('lib/lovui')
 local set = require('lib/set')
 
 local View = {}
 
-function View:new(model)
-    self.model = model
+function View:new()
     self.ui = ui
     self.scr = nil
     self.sel_ship = {val='wasp'}
@@ -19,9 +18,8 @@ function View:new(model)
     self.radar = love.graphics.newImage(set.OBJ['radar'])
     self.blink = true
     self.blink_time = 0.5
-    self.tmr = Timer:new()
+    self.tmr = Tmr:new()
     self.tmr:every(self.blink_time, function() self.blink=not self.blink end)
-    return self
 end
 
 function View:set_start_scr()
@@ -37,31 +35,31 @@ function View:set_start_scr()
 
     ui.Button{x=400, y=set.HEI-93, image=set.OBJ['start'],
              command=function() set.AUD['click']:play()
-                                self.model:startgame() end}
+                                Model:startgame() end}
     -- select level
     ui.Label{x=604, y=set.HEI-90, fnt=set.GAMEFNT,fntclr=set.DISPGREEN,
-                variable=self.model.level, scewy=0.2}
+                variable=Model.level, scewy=0.2}
     ui.Button{x=584, y=set.HEI-92, image=set.OBJ['levleft'],
         command=function() set.AUD['click']:play()
-                if self.model.level.val>1 then
-                    self.model.level.val=self.model.level.val-1 end
+                if Model.level.val>1 then
+                    Model.level.val=Model.level.val-1 end
                 end}
     ui.Button{x=624, y=set.HEI-84,image=set.OBJ['levright'],
         command=function() set.AUD['click']:play()
-                if self.model.level.val<self.model.maxlevel then
-                    self.model.level.val=self.model.level.val+1 end
+                if Model.level.val<Model.maxlevel then
+                    Model.level.val=Model.level.val+1 end
                 end}
     -- score
-    ui.Label{x=175, y=set.HEI-234, text=self.model.lastscore,
+    ui.Label{x=175, y=set.HEI-234, text=Model.lastscore,
                 fnt=set.MENUFNT, fntclr=set.DISPGREEN, scewy=0.05}
-    ui.Label{x=175, y=set.HEI-164, text=self.model.maxscore,
+    ui.Label{x=175, y=set.HEI-164, text=Model.maxscore,
                 fnt=set.MENUFNT, fntclr=set.DISPGREEN, scewy=-0.05}
     -- aud
     ui.CheckBox{x=79,y=set.HEI-82, mode='line',
-                image=set.OBJ['sfx'], variable=self.model.sfx,
+                image=set.OBJ['sfx'], variable=Model.sfx,
                 command=function() set.AUD['click']:play() end}
     ui.CheckBox{x=146,y=set.HEI-91, mode='line',
-                image=set.OBJ['music'], variable=self.model.audio,
+                image=set.OBJ['music'], variable=Model.audio,
                 command=function() set.AUD['click']:play() end}
 end
 
@@ -86,16 +84,16 @@ function View:draw()
     end
 
     if self.scr=='game_scr' then
-        love.graphics.setColor({self.model.fade,self.model.fade,
-                               self.model.fade,self.model.fade})
+        love.graphics.setColor({Model.fade,Model.fade,
+                               Model.fade,Model.fade})
         love.graphics.draw(self.bg)
 
-        for item in pairs(self.model.objects) do
+        for item in pairs(Model.objects) do
             if item.draw then item:draw() end
         end
     end
     -- particle menu & game
-    for particle in pairs(self.model.particle) do
+    for particle in pairs(Model.particle) do
         love.graphics.draw(particle)
     end
 
@@ -105,9 +103,9 @@ function View:draw()
         love.graphics.setColor(set.DISPYELLOW)
 
         if self.blink then
-            for i=1,self.model.level.val do
-                love.graphics.circle('fill',self.model.aster_coords[i][1],
-                                        self.model.aster_coords[i][2], 2)
+            for i=1,Model.level.val do
+                love.graphics.circle('fill',Model.aster_coords[i][1],
+                                        Model.aster_coords[i][2], 2)
             end
             -- asteroids blink
             love.graphics.setColor(set.DISPBLACK)
@@ -115,18 +113,18 @@ function View:draw()
         end
         -- show radar line
         love.graphics.setColor(set.DISPGREEN)
-        love.graphics.line(self.model.radar.x1, self.model.radar.y1,
-                           self.model.radar.x2, self.model.radar.y2)
+        love.graphics.line(Model.radar.x1, Model.radar.y1,
+                           Model.radar.x2, Model.radar.y2)
         love.graphics.setLineWidth(7)
         love.graphics.setColor({set.DISPGREEN[1], set.DISPGREEN[2],
                                set.DISPGREEN[3], 0.2})
-        love.graphics.line(self.model.radar.x1, self.model.radar.y1,
-                           self.model.old_radarx, self.model.old_radary)
+        love.graphics.line(Model.radar.x1, Model.radar.y1,
+                           Model.old_radarx, Model.old_radary)
         love.graphics.setLineWidth(1)
         -- center dot
-        love.graphics.circle('fill',self.model.radar.x1,self.model.radar.y1,4)
-        love.graphics.setColor({self.model.fade, self.model.fade,
-                               self.model.fade, self.model.fade})
+        love.graphics.circle('fill',Model.radar.x1,Model.radar.y1,4)
+        love.graphics.setColor({Model.fade, Model.fade,
+                               Model.fade, Model.fade})
         -- radar cover
         love.graphics.draw(self.radar, 533, set.HEI-228)
     end

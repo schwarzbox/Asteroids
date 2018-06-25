@@ -2,7 +2,7 @@
 -- (c) Alexander Veledzimovich
 -- model ASTEROIDS
 
-local Timer = require('lib/tmr')
+local Tmr = require('lib/tmr')
 local imd = require('lib/lovimd')
 local fl = require('lib/lovfl')
 local cmp = require('lib/lovcmp')
@@ -12,12 +12,11 @@ local set = require('lib/set')
 local Model = {}
 Model.tag = 'model'
 -- static cmp
-Model.get_dist = cmp.get_dist
+Model.get_hypot = cmp.get_hypot
 Model.get_randpos = cmp.get_randpos
 -- particle
 Model.local_particle=cmp.local_particle
-function Model:new(view)
-    self.view = view
+function Model:new()
     self.ships = {wasp=obj.Wasp,wing=obj.Wing}
     -- load data
     local olddata = fl.load_love(set.SAVE) or {1,0}
@@ -26,7 +25,7 @@ function Model:new(view)
     self.maxscore = olddata[2]
     -- radar
     self.radar = {x1=627,y1=set.HEI-164,x2=676,y2=set.HEI-131}
-    self.radius = self.get_dist(self.radar.x1,self.radar.y1,
+    self.radius = self.get_hypot(self.radar.x1,self.radar.y1,
                                 self.radar.x2,self.radar.y2)
     self.old_radarx,self.old_radary=self.radar.x2,self.radar.y2
     self.radar_min = 1
@@ -34,7 +33,7 @@ function Model:new(view)
     self.border = imd.circle_px(self.radius)
     self.all_dots = imd.circle_all_px(self.radius-20)
 
-    self.tmr = Timer:new()
+    self.tmr = Tmr:new()
     -- sound bool
     self.audio = {bool=true}
     self.sfx = {bool=true}
@@ -43,6 +42,8 @@ function Model:new(view)
 end
 
 function Model:reset()
+    Ctrl:bind('space','start',function() set.AUD['click']:play()
+                                             Model:startgame() end)
     self.particle ={}
     self.objects = {}
     self.avatar = nil
@@ -73,7 +74,7 @@ function Model:reset()
     set.AUD['intro']:setLooping(true)
     set.AUD['intro']:play()
 
-    self.view:set_start_scr()
+    View:set_start_scr()
 end
 
 function Model:spawn(item) self.objects[item] = item end
@@ -81,8 +82,12 @@ function Model:destroy(item) self.objects[item] = nil end
 function Model:getobj() return self.objects end
 
 function Model:startgame()
+    -- update bind for space
+    Ctrl:unbind('space')
+    Ctrl:bind('space','fire')
+
     set.AUD['intro']:stop()
-    self.avatar = self.ships[self.view.sel_ship.val]{model=self,
+    self.avatar = self.ships[View.sel_ship.val]{model=self,
                                                    x=set.MIDWID,
                                                    y=set.MIDHEI}
 
@@ -97,14 +102,15 @@ function Model:startgame()
     set.AUD['loop']:setLooping(true)
     set.AUD['loop']:play()
     -- fade
-    self.tmr:after(0.3, function () self.view:set_game_scr() end)
+    self.tmr:after(0.3, function () View:set_game_scr() end)
+    -- protect double click
     self.tmr.sleep(0.3)
     set.AUD['fly']:play()
 
 end
 
 function Model:update(dt)
-    if self.view.scr=='ui_scr' then
+    if View.scr=='ui_scr' then
         -- on/off audio
         if self.audio.bool==false then
             set.AUD['loop']:setVolume(0)
@@ -149,7 +155,7 @@ function Model:update(dt)
     self.grdust:setPosition(randx,randy)
 
     -- game
-    if self.view.scr=='game_scr' then
+    if View.scr=='game_scr' then
         if self.pause then return end
         set.AUD['loop']:setVolume(self.volume)
         -- clouds
@@ -158,6 +164,7 @@ function Model:update(dt)
 
         local num_aster = 0
         for object in pairs(self.objects) do
+            object.last_collision = {}
             if object.update then object:update(dt) end
             if object.tag=='aster' then num_aster = num_aster+1 end
         end
@@ -173,13 +180,13 @@ function Model:update(dt)
         end
         -- fade
         if not self.avatar and not self.fin then
-            self.fin = self.tmr:after(3, function()
-                        self.tmr:tween(2, self, {fade=0,volume=0}, 'linear',
+            self.fin = self.tmr:after(2.5, function()
+                        self.tmr:tween(1.5, self, {fade=0,volume=0}, 'linear',
                                 function () self:endgame() end) end)
         end
     end
     -- ui update
-    for _, item in pairs(self.view.ui.Manager.items) do item:update(dt) end
+    for _, item in pairs(View.ui.Manager.items) do item:update(dt) end
 end
 
 function Model:endgame()

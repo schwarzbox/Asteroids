@@ -9,7 +9,8 @@ local set = require('lib/set')
 
 local O={}
 O.Base = cls.Cls({model=nil, x=nil,y=nil, rot_ang=0, dx=0, dy=0,rot_dt=0,
-                 scale=set.SCALE, particle={}})
+                 scale=set.SCALE, body='dynamic',collider='circle',
+                 particle={}})
 -- cmp
 O.Base.set_obj = cmp.set_obj
 O.Base.borders = cmp.endless_scr
@@ -17,16 +18,13 @@ O.Base.move_upd = cmp.move_upd
 O.Base.move = cmp.move
 O.Base.rotate = cmp.rotate
 O.Base.rotate_upd = cmp.rotate_upd
-O.Base.collide = cmp.circle_collision
-O.Base.end_collision = cmp.end_collision
+O.Base.collision = cmp.collision
 O.Base.hit = cmp.hit
-O.Base.bounce = cmp.bounce
 -- particle
 O.Base.destroy_obj = cmp.destroy_obj
 O.Base.boom = cmp.global_particle
 O.Base.local_particle = cmp.local_particle
 O.Base.particle_upd = cmp.particle_upd
-
 function O.Base:__tostring() return self.tag end
 
 function O.Base:draw()
@@ -147,7 +145,7 @@ O.Wing = cls.Cls(O.Base,{tag = 'wing'})
 O.Wing.img_data = set.OBJ[O.Wing.tag]
 O.Wing.speed = 2.5
 O.Wing.maxspeed = 100
-O.Wing.rotspeed = math.rad(1.5)
+O.Wing.rotspeed = math.rad(1.3)
 O.Wing.maxrotspeed = math.rad(100)
 O.Wing.hp = 5
 -- cmp
@@ -158,7 +156,7 @@ function O.Wing:new(o)
 
     self.weapon = O.Rocket
     self.weapon_side = 'right'
-    self.weapon_delta = {0,0}
+    self.weapon_delta = {15,0}
 
     self.engine1 = self:local_particle(7, {set.ORANGE,set.LIGHTGRAY,
                                    set.DARKGRAYF}, nil, nil, {1,0.1})
@@ -231,7 +229,7 @@ function O.Wing:update(dt)
 end
 
 
-O.Bullet = cls.Cls(O.Base,{tag='bullet'})
+O.Bullet = cls.Cls(O.Base,{tag='bullet',collider='box'})
 -- const
 O.Bullet.img_data = set.OBJ[O.Bullet.tag]
 O.Bullet.speed = 600
@@ -250,7 +248,7 @@ function O.Bullet:new(o)
     self.dy = self.dy+love.math.random(-self.mistake, self.mistake)
 
     self:move()
-    -- init
+
     self:boom(self.x, self.y, 10, {12,8,6}, nil, nil, {0.02,0.06})
     set.AUD['bullet']:stop()
     set.AUD['bullet']:play()
@@ -278,18 +276,16 @@ function O.Bullet:destroy()
 end
 
 
-O.Rocket = cls.Cls(O.Base,{tag='rocket'})
+O.Rocket = cls.Cls(O.Base,{tag='rocket',collider='box'})
 -- const
 O.Rocket.img_data = set.OBJ[O.Rocket.tag]
-O.Rocket.speed = 3
+O.Rocket.speed = 5
 O.Rocket.maxspeed = 500
-O.Rocket.cooldown = 0.8
+O.Rocket.cooldown = 0.9
 O.Rocket.lifetime = 3
 O.Rocket.damage = 3
 O.Rocket.inertion = -20
-O.Rocket.mistake = 8
--- cmp
-O.Rocket.collide = cmp.dot_collision
+O.Rocket.mistake = 4
 function O.Rocket:new(o)
     self.image, self.rect = self:set_obj(self.img_data)
     self.destroy_data = imd.splash_imd(self.img_data, 5, 10)
@@ -300,7 +296,8 @@ function O.Rocket:new(o)
     self.engine = self:local_particle(6, {set.ORANGE,set.GRAYF,set.DARKGRAYF},
                                         nil, {0.7,1.2}, {1,0.1})
 
-    self:boom(self.x, self.y, 10, {8,6,4}, {set.WHITE,set.GRAY,set.GRAYF})
+    self:boom(self.rect.left[1], self.rect.left[2], 60, {8,6,4},
+                            {set.WHITE,set.GRAY,set.GRAYF})
     set.AUD['rocket']:stop()
     set.AUD['rocket']:play()
 
@@ -310,7 +307,7 @@ end
 function O.Rocket:update(dt)
     self.Super.update(self,dt)
     self:move()
-    if self.lifetime<=2 then
+    if self.lifetime<=2.5 then
         self:particle_upd(dt, self.engine, 'left', {0,0})
         self.engine:emit(1)
     end
@@ -362,24 +359,25 @@ function O.Asteroid:new(o)
         self.img_data = self.aster_data[love.math.random(#self.aster_data)]
     end
     self.image, self.rect = self:set_obj(self.img_data)
-    self.born=true
+
     self.model:spawn(self)
 end
 
 function O.Asteroid:update(dt)
     self.Super.update(self,dt)
-    local obj = self.model:getobj()
-    for item in pairs(obj) do
-        if item:collide(self) then
-            if item.tag=='bullet' or item.tag=='rocket' then
-                item:destroy()
-                if self:hit(item.damage,item) then self:destroy() return end
+    local objects = self.model:getobj()
+    for obj in pairs(objects) do
+        if obj.tag~='aster' and obj:collision(self,dt) then
+            if obj.tag=='bullet' or obj.tag=='rocket' then
+                obj:destroy()
+                if self:hit(obj.damage,obj) then self:destroy() return end
             end
-            if item.tag=='wasp' or item.tag=='wing' then
+            if obj.tag=='wasp' or obj.tag=='wing' then
                 self:destroy()
-                if item:hit(self.damage) then item:destroy() return end
+                if obj:hit(self.damage) then obj:destroy() return end
             end
         end
+
     end
 end
 

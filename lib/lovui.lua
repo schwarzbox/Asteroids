@@ -25,8 +25,12 @@
 -- FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 -- DEALINGS IN THE SOFTWARE.
 
+-- made counter timer for down button in counter
+-- keys ?
+
 -- check widget hbox setup
--- move hbox and vbox drag ui ctrl
+-- move hbox and vbox drag
+-- ui ctrl
 -- progress bar with images
 -- hbox and vbox align
 
@@ -43,6 +47,7 @@ local WHITE = {1,1,1,1}
 local FNTCLR = {128/255,128/255,128/255,1}
 local FRMCLR = {64/255,64/255,64/255,1}
 local FNT = {nil,16}
+
 local UI = {}
 
 function UI.Cls(Super, cls)
@@ -87,9 +92,9 @@ function UI.Manager.outfocus()
 end
 
 
-UI.Base = UI.Cls({x=nil, y=nil, anchor='center', frame=0, frmclr=FRMCLR,
+local Proto = UI.Cls({x=nil, y=nil, anchor='center', frame=0, frmclr=FRMCLR,
                  mode='line',wid=0, hei=0, corner={4,4,2}})
-function UI.Base.set_place(itx,ity,itwid,ithei,side)
+function Proto.set_place(itx,ity,itwid,ithei,side)
     local x,y
     local midx,midy = itwid/2,ithei/2
     if side=='n' then x, y = itx-midx,ity
@@ -105,15 +110,15 @@ function UI.Base.set_place(itx,ity,itwid,ithei,side)
     return x,y
 end
 
-function UI.Base:set_widhei(wid,hei)
+function Proto:set_widhei(wid,hei)
     if wid>self.wid then self.wid = wid end
     if hei>self.hei then self.hei = hei end
     self.wid = self.wid+self.wid%2
     self.hei = self.hei+self.hei%2
 end
 
-function UI.Base:draw_frame()
-    love.graphics.setColor(self.frmclr)
+function Proto:draw_frame()
+    love.graphics.setColor(self.deffrm)
     if self.frame>0 and self.wid>0 then
         love.graphics.rectangle(self.mode, self.rect_posx, self.rect_posy,
                                 self.wid+self.frame*2, self.hei+self.frame*2,
@@ -121,11 +126,11 @@ function UI.Base:draw_frame()
     end
 end
 
-function UI.Base:remove() UI.Manager.remove(self) end
+function Proto:remove() UI.Manager.remove(self) end
 
 
 
-UI.HBox = UI.Cls(UI.Base,{sep=8})
+UI.HBox = UI.Cls(Proto,{sep=8})
 UI.HBox.type = 'hbox'
 function UI.HBox:new(o)
     self.items = {}
@@ -208,7 +213,7 @@ function UI.VBox:setup()
 end
 
 
-UI.Label = UI.Cls(UI.Base,{text='', fnt=FNT, fntclr=FNTCLR,
+UI.Label = UI.Cls(Proto,{text='', fnt=FNT, fntclr=FNTCLR,
                     variable=nil, image=nil, rotate=0, rot_dt=nil,
                     scalex=1, scaley=1, pivot='nw', scewx=0, scewy=0})
 UI.Label.type = 'label'
@@ -310,6 +315,9 @@ function UI.Label:draw()
     self:draw_frame()
     love.graphics.setColor(self.defclr)
     if self.image then
+        if self.type=='button' then
+            love.graphics.setColor(self.imgclr)
+        end
         love.graphics.push()
         love.graphics.draw(self.image, self.cenx, self.ceny, self.rotate,
                            self.scalex, self.scaley, self.pivx, self.pivy,
@@ -338,7 +346,7 @@ function UI.Input:new(o)
     self.keyrep = 0.5
     self.rep = self.keyrep
     self.focus = false
-    self.Super.new(self)
+    UI.Input.Super.new(self)
     -- cursor setup
     self.cursorx, self.cursory = self.set_size(self.font, '')
     self.curpos = 0
@@ -454,7 +462,7 @@ end
 UI.CheckBox = UI.Cls(UI.Label,{mode='fill',command=function() end})
 UI.CheckBox.type = 'checkbox'
 function UI.CheckBox:new(o)
-    self.Super.new(self)
+    UI.CheckBox.Super.new(self)
     if self.variable.bool then self.defclr=self.onclr end
 end
 
@@ -497,6 +505,13 @@ end
 
 UI.Button = UI.Cls(UI.Label,{command=function() end})
 UI.Button.type = 'button'
+
+function UI.Button:new(o)
+    UI.Button.Super.new(self)
+    -- to light image
+    self.imgclr = self.onclr
+end
+
 function UI.Button:update(dt)
     self:rotate_image(dt)
     self:setup()
@@ -515,8 +530,12 @@ function UI.Button:update(dt)
         self.defclr = self.fntclr
     end
 
-    if self:mouse_collide() then self.frmclr = self.onfrm
-    else self.frmclr = self.deffrm
+    if not click and self:mouse_collide() then
+        if self.image then self.imgclr = self.onclr
+        else self.deffrm = self.onfrm end
+    else
+        if self.image then self.imgclr = self.fntclr
+        else self.deffrm = self.frmclr end
     end
     return click
 end
@@ -536,7 +555,7 @@ end
 
 function UI.Selector:setup()
     self:switch()
-    self.Super.setup(self)
+    UI.Selector.Super.setup(self)
 end
 
 function UI.Selector:update(dt)

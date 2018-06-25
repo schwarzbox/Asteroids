@@ -1,5 +1,5 @@
 #!/usr/bin/env lua
--- CLASS
+-- CLS
 -- 1.0
 -- OOP (lua)
 -- cls.lua
@@ -25,11 +25,14 @@
 -- FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 -- DEALINGS IN THE SOFTWARE.
 
+-- 2.0
 -- convert table to class?
+-- check double inheritance
 
 if arg[0] then print('1.0 OOP (lua)', arg[0]) end
+local CLS = {}
 
-local function Cls(Super,class)
+function CLS.Cls(Super,class)
     Super = Super or {}
     class = class or {}
     class.Super = Super
@@ -56,4 +59,4 @@ local function Cls(Super,class)
     return setmetatable(class, meta)
 end
 
-return {['Cls'] = Cls}
+return CLS

@@ -198,8 +198,8 @@ function Ease.out_in_bounce(elapsed,st,diff,time)
     end
 end
 
-local Timer = {}
-function Timer:new()
+local TMR = {}
+function TMR:new()
     self.__index = self
     self=setmetatable({},self)
 
@@ -225,60 +225,60 @@ function Timer:new()
     return self
 end
 
-function Timer.sleep(time)
+function TMR.sleep(time)
     local final_time=os.clock()+time
     repeat until os.clock()>final_time
 end
 
-function Timer:cancel(timer)
+function TMR:cancel(timer)
     self.after_timers[timer] = nil self.every_timers[timer] = nil
     self.during_timers[timer] = nil self.tween_timers[timer] = nil
     self.script_timers[timer] = nil
 end
 
-function Timer:clear()
+function TMR:clear()
     self.after_timers = {} self.every_timers = {}
     self.during_timers = {} self.tween_timers = {}
     self.script_timers = {}
 end
 
-function Timer:key_cancel(timers,key)
+function TMR:keycancel(timers,key)
     for timer in pairs(timers) do
         if timer.key and timer.key==key then self:cancel(timer) end
     end
 end
 
-function Timer:after(time,func,key)
+function TMR:after(time,func,key)
     local timer = {elapsed=0, time=time, func=func, key=key}
-    self:key_cancel(self.after_timers,key)
+    self:keycancel(self.after_timers,key)
     self.after_timers[timer] = timer
     return timer
 end
 
-function Timer:every(time,func,count,key)
+function TMR:every(time,func,count,key)
     count = count or math.huge
     local timer ={elapsed=0, time=time, func=func, count=count, key=key}
-    self:key_cancel(self.every_timers,key)
+    self:keycancel(self.every_timers,key)
     self.every_timers[timer]=timer
     return timer
 end
 
-function Timer:during(time,func,after,key)
+function TMR:during(time,func,after,key)
     after = after or function() end
     local timer = {elapsed=0, time=time, func=func, after=after, key=key}
-    self:key_cancel(self.during_timers, key)
+    self:keycancel(self.during_timers, key)
     self.during_timers[timer] = timer
     return timer
 end
 
-function Timer:script(func, key)
+function TMR:script(func, key)
     local coroutine_func = coroutine.wrap(func)
     local timer = {func=coroutine_func, key=key}
-    self:key_cancel(self.script_timers, key)
+    self:keycancel(self.script_timers, key)
     self.script_timers[timer] = timer
 end
 
-function Timer:tween(time,init,fin,ease,after,key)
+function TMR:tween(time,init,fin,ease,after,key)
     ease = ease or 'linear'
     local st = {}
     for k,v in pairs(init) do st[k] = v end
@@ -287,12 +287,12 @@ function Timer:tween(time,init,fin,ease,after,key)
 
     local timer = {elapsed=0, time=time, st=st,diff=diff, delta=init,
                                         ease=ease,after=after, key=key}
-    self:key_cancel(self.tween_timers, key)
+    self:keycancel(self.tween_timers, key)
     self.tween_timers[timer] = timer
     return timer
 end
 
-function Timer:update(dt)
+function TMR:update(dt)
     local remove = {}
     for timer in pairs(self.after_timers) do
         timer.elapsed = timer.elapsed+dt
@@ -348,4 +348,4 @@ function Timer:update(dt)
     for i=1, #remove do self:cancel(remove[i]) end
 end
 
-return Timer
+return TMR

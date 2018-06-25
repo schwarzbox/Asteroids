@@ -26,10 +26,16 @@
 -- DEALINGS IN THE SOFTWARE.
 
 -- 0.3
+-- gradient
+-- flip img
+-- rotate improve
 -- blend modes
--- improve spalsh
+-- improve splash
 
+-- old lua version
 local unpack = table.unpack or unpack
+local utf8 = require('utf8')
+
 local IMD = {}
 
 function IMD.matrix_imd(matrix, color, scale)

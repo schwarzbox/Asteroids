@@ -29,7 +29,9 @@
 -- lfs system
 
 local unpack = table.unpack or unpack
+local utf8 = require('utf8')
 local lfs = love.filesystem
+
 local FL={}
 
 function FL.load_all(dir,...)

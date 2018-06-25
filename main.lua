@@ -1,6 +1,6 @@
 #!/usr/bin/env love
 -- ASTEROIDS
--- 1.0
+-- 1.5
 -- Game (love2d)
 -- main.lua
 
@@ -26,14 +26,14 @@
 -- DEALINGS IN THE SOFTWARE.
 
 -- 2.0
--- asterids bounce (borders and born)
+-- + dim screen in first menu
+-- auto stop rotation ship
 -- refactor radar
--- move ship after hit
 
 local imd = require('lib/lovimd')
-local Model = love.filesystem.load('lib/model.lua')()
-local View = love.filesystem.load('lib/view.lua')()
-local Ctrl = love.filesystem.load('lib/ctrl.lua')()
+Model = love.filesystem.load('lib/model.lua')()
+View = love.filesystem.load('lib/view.lua')()
+Ctrl = love.filesystem.load('lib/lovctrl.lua')()
 local set = require('lib/set')
 
 io.stdout:setvbuf('no')
@@ -44,16 +44,19 @@ function love.load()
     love.window.setFullscreen(set.FULLSCR, 'desktop')
     -- make icon
     love.window.setIcon(imd.rotate_imd(set.OBJ['wasp'],'CCW'))
-    -- create new model and new view
-    Model:new(View:new(Model))
-    -- controller
+
+    -- set controller
     Ctrl:new()
+    -- set model & view
+    View:new()
+    Model:new()
+
     -- ship
-    Ctrl:bind('space','fire')
     Ctrl:bind('w','forward')
     Ctrl:bind('w','stop', function() set.AUD['engine']:stop() end)
     Ctrl:bind('d','right')
     Ctrl:bind('a','left')
+
     --love
     Ctrl:bind('lgui+r','restart',function() love.event.quit('restart') end)
     Ctrl:bind('lgui+p','pause', function()
@@ -61,6 +64,7 @@ function love.load()
                                 Model.pause = not Model.pause
                                 View:set_label('PAUSE',Model.pause) end
                             end)
+
     Ctrl:bind('escape','quit', function() love.quit() love.event.quit() end)
     Ctrl:bind('lgui+q','cmdq', function() love.event.quit(1) end)
 end
@@ -68,8 +72,9 @@ end
 -- dt around 0.016618420952
 function love.update(dt)
     local upd_title = string.format('%s %s fps %.2d', set.GAMENAME, set.VER,
-                                  love.timer.getFPS())
+                                   love.timer.getFPS())
     love.window.setTitle(upd_title)
+
     -- update model
     Model:update(dt)
     -- ctrl ship
@@ -81,10 +86,11 @@ function love.update(dt)
         if Ctrl:down('left') then ava:rotate(-1) end
         if Ctrl:down('fire', ava.weapon.cooldown) then
             -- change gun
-            ava.weapon_delta={0,-ava.weapon_delta[2]}
+            ava.weapon_delta={ava.weapon_delta[1],-ava.weapon_delta[2]}
             ava:shot(ava.weapon_side,ava.weapon_delta,ava.weapon.inertion)
         end
     end
+    Ctrl:press('start')
     -- ctrl love
     Ctrl:press('pause')
     Ctrl:press('restart')
