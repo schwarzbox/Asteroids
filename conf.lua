@@ -2,7 +2,7 @@
 
 function love.conf(t)
     -- The name of the save directory (string)
-    t.identity = 'Asteroids!_data'
+    t.identity = 'Asteroids!data'
     -- Search files in source directory before save directory (boolean)
     t.appendidentity = false
     -- The LÖVE ver this game was made for (string)

@@ -1,6 +1,6 @@
 #!/usr/bin/env lua
 -- TMR
--- 0.2
+-- 1.0
 -- Timer (lua+love2d)
 -- tmr.lua
 
@@ -25,9 +25,9 @@
 -- FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 -- DEALINGS IN THE SOFTWARE.
 
--- 1.0
+-- 2.0
 -- add function with additional args ease elastic
--- Time without instance
+-- meta function len
 
 -- Based on Tweener's easing functions (Penner's Easing Equations)
 
@@ -38,6 +38,11 @@
 -- step = step back
 
 if arg[0] then print('1.0 TMR Timer (lua+love2d)', arg[0]) end
+if arg[1] then print('1.0 TMR Timer (lua+love2d)', arg[1]) end
+
+-- old lua version
+local unpack = table.unpack or unpack
+local utf8 = require('utf8')
 
 local Ease = {}
 function Ease.linear(elapsed,st,diff,time) return diff*elapsed/time+st end
@@ -202,8 +207,10 @@ local TMR = {}
 function TMR:new()
     self.__index = self
     self=setmetatable({},self)
-
     self:clear()
+    self.all_timers = {self.after_timers, self.every_timers,
+                        self.during_timers, self.tween_timers,
+                        self.script_timers}
 
     if  love and love.update then
         local loveupdate = love.update
@@ -230,10 +237,22 @@ function TMR.sleep(time)
     repeat until os.clock()>final_time
 end
 
+function TMR:len()
+    local len = 0
+    for i=1,#self.all_timers do
+        local count=0
+        for _ in pairs(self.all_timers[i]) do
+            count = count+1
+        end
+        len = len+count
+    end
+    return len
+end
+
 function TMR:cancel(timer)
-    self.after_timers[timer] = nil self.every_timers[timer] = nil
-    self.during_timers[timer] = nil self.tween_timers[timer] = nil
-    self.script_timers[timer] = nil
+    for i=1,#self.all_timers do
+        self.all_timers[i][timer] = nil
+    end
 end
 
 function TMR:clear()

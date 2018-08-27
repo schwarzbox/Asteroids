@@ -26,18 +26,19 @@
 -- DEALINGS IN THE SOFTWARE.
 
 -- 0.3
--- gradient
--- flip img
--- rotate improve
 -- blend modes
 -- improve splash
+
+if arg[1] then print('0.2 LOVIMG Image Functions (love2d)', arg[1]) end
 
 -- old lua version
 local unpack = table.unpack or unpack
 local utf8 = require('utf8')
 
-local IMD = {}
+local EMPTY = {1,1,1,0}
+local WHITE = {1,1,1,1}
 
+local IMD = {}
 function IMD.matrix_imd(matrix, color, scale)
     scale = scale or 1
     local sx = #matrix[1]
@@ -54,7 +55,28 @@ function IMD.matrix_imd(matrix, color, scale)
     return data
 end
 
-function IMD.imd_mat(image_data)
+function IMD.resize_imd(image_data, scale)
+    scale = scale or 1
+    local sx, sy = image_data:getDimensions()
+    local data = love.image.newImageData(math.ceil(sx*scale),
+                                          math.ceil(sy*scale))
+    for x=1, sx do
+        for y=1, sy do
+            local r,g,b,a = image_data:getPixel(x-1, y-1)
+            local initx = math.floor((x-1)*scale)
+            local inity = math.floor((y-1)*scale)
+            data:setPixel(initx,inity, r,g,b,a )
+            for dx=0,scale-1 do
+                for dy=0,scale-1 do
+                    data:setPixel(initx+dx,inity+dy, r,g,b,a)
+                end
+            end
+        end
+    end
+    return data
+end
+
+function IMD.imgdata_mat(image_data)
     local mat={}
     local sx, sy=image_data:getDimensions()
     for y=1, sy do
@@ -74,8 +96,8 @@ function IMD.mask_imd(image_data,...)
     local color = colors[1]
     local sx, sy = image_data:getDimensions()
     local data = love.image.newImageData(sx,sy)
-    for y=1, sy do
-        for x=1, sx do
+    for x=1, sx do
+        for y=1, sy do
             local _,_,_,a = image_data:getPixel(x-1, y-1)
             if a~=0 then
                 if #colors>1 then
@@ -89,7 +111,26 @@ function IMD.mask_imd(image_data,...)
     return data
 end
 
-function IMD.shape() end
+function IMD.text_imd(text,size,color,fnt)
+    text = text or ' '
+    size = size or 16
+    color = color or WHITE
+    local font
+    if fnt then font = love.graphics.newFont(fnt,size)
+    else font = love.graphics.newFont(size) end
+
+    local sx,sy = font:getWidth(text),font:getHeight()
+    local canvas = love.graphics.newCanvas(sx,sy)
+    love.graphics.setCanvas(canvas)
+    love.graphics.setFont(font)
+    love.graphics.setColor(color)
+    love.graphics.setBlendMode('alpha')
+    love.graphics.print(text)
+    love.graphics.setColor(WHITE)
+    love.graphics.setCanvas()
+    local data = canvas:newImageData()
+    return data
+end
 
 function IMD.merge_imd(image_data1,image_data2,x,y,blend)
     x = x or 0
@@ -120,7 +161,7 @@ function IMD.splash_imd(image_data,num,radius,maincolor,borcolor)
     for _=1,num do
         local rand_radius=love.math.random(radius)
         -- print(rand_radius)
-        local all_dots=IMD.circle_all_px(rand_radius)
+        local all_dots=IMD.circle_allpx(rand_radius)
         local dots=IMD.circle_px(rand_radius)
         local cenx=love.math.random(radius+2,sx-radius-2)
         local ceny=love.math.random(radius+2,sy-radius-2)
@@ -180,47 +221,36 @@ function IMD.random_imd(sx,sy,num,blend,...)
     return data
 end
 
-function IMD.resize_imd(image_data, scale)
-    scale = scale or 1
-    local sx, sy = image_data:getDimensions()
-    local data = love.image.newImageData(math.ceil(sx*scale),
-                                          math.ceil(sy*scale))
-    for x=1, sx do
-        for y=1, sy do
-            local r,g,b,a = image_data:getPixel(x-1, y-1)
-            local initx = math.floor((x-1)*scale)
-            local inity = math.floor((y-1)*scale)
-            data:setPixel(initx,inity, r,g,b,a )
-            for dx=0,scale-1 do
-                for dy=0,scale-1 do
-                    data:setPixel(initx+dx,inity+dy, r,g,b,a )
-                end
-            end
-        end
-    end
-    return data
-end
-
 function IMD.rotate_imd(image_data, side)
     local sx, sy = image_data:getDimensions()
-    local data = love.image.newImageData(sy,sx)
-    if side=='CW' then
-        for x=1,sx do
-            for y=1,sy do
-                local r,g,b,a = image_data:getPixel(x-1, y-1)
-                local initx = (sy-(y-1))-1
-                local inity = x-1
-                data:setPixel(initx,inity, r,g,b,a )
+    local data
+    if side=='CW' or side=='CCW' then
+        data = love.image.newImageData(sy,sx)
+    else
+        data = love.image.newImageData(sx,sy)
+    end
+    local initx
+    local inity
+    for x=1,sx do
+        for y=1,sy do
+            local r,g,b,a = image_data:getPixel(x-1, y-1)
+            if side=='CW' then
+                initx = sy-y
+                inity = x-1
+            elseif side=='CCW' then
+                initx = y-1
+                inity = sx-x
+            elseif side=='HFLIP' then
+                initx = sx-x
+                inity = y-1
+            elseif side=='VFLIP' then
+                initx = x-1
+                inity = sy-y
+            else
+                initx = x-1
+                inity = sy-y
             end
-        end
-    elseif side=='CCW' then
-        for x=1,sx do
-            for y=1,sy do
-                local r,g,b,a = image_data:getPixel(x-1, y-1)
-                local initx = y-1
-                local inity = (sx-(x-1))-1
-                data:setPixel(initx,inity, r,g,b,a )
-            end
+            data:setPixel(initx,inity, r,g,b,a )
         end
     end
     return data
@@ -231,8 +261,8 @@ function IMD.slice_imd(image_data,tilex,tiley,numx,numy)
     numy=numy or 1
     local sx, sy = image_data:getDimensions()
     local arr = {}
-    for x=0,numx-1 do
-        for y=0,numy-1 do
+    for y=0,numy-1 do
+        for x=0,numx-1 do
             local data = love.image.newImageData(tilex,tiley)
             -- source, destx, desty, sourcex, sourcey, source wid, source hei
             data:paste(image_data,0,0,x*tilex, y*tiley,sx,sy)
@@ -242,7 +272,7 @@ function IMD.slice_imd(image_data,tilex,tiley,numx,numy)
     return arr
 end
 
-function IMD.circle_all_px(radius)
+function IMD.circle_allpx(radius)
     local  arr = {}
     for i=1,radius do
         local tmp = IMD.circle_px(i)

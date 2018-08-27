@@ -26,12 +26,16 @@
 -- DEALINGS IN THE SOFTWARE.
 
 -- 2.0
--- convert table to class?
--- check double inheritance
+-- convert table to class
 
-if arg[0] then print('1.0 OOP (lua)', arg[0]) end
+if arg[0] then print('1.0 CLS OOP (lua)', arg[0]) end
+if arg[1] then print('1.0 CLS OOP (lua)',arg[1]) end
+
+-- old lua version
+local unpack = table.unpack or unpack
+local utf8 = require('utf8')
+
 local CLS = {}
-
 function CLS.Cls(Super,class)
     Super = Super or {}
     class = class or {}
@@ -46,7 +50,7 @@ function CLS.Cls(Super,class)
                 end
     -- merge class
     meta.__add = function (self, oth)
-                    local New = Cls(self)
+                    local New = CLS.Cls(self)
                     for k,v in pairs(oth) do New[k] = v  end
                     return New
                 end

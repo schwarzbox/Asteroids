@@ -8,7 +8,7 @@ local cls = require('lib/cls')
 local set = require('lib/set')
 
 local O={}
-O.Base = cls.Cls({model=nil, x=nil,y=nil, rot_ang=0, dx=0, dy=0,rot_dt=0,
+O.Base = cls.Cls({x=nil,y=nil, rot_ang=0, dx=0, dy=0,rot_dt=0,
                  scale=set.SCALE, body='dynamic',collider='circle',
                  particle={}})
 -- cmp
@@ -18,17 +18,18 @@ O.Base.move_upd = cmp.move_upd
 O.Base.move = cmp.move
 O.Base.rotate = cmp.rotate
 O.Base.rotate_upd = cmp.rotate_upd
+O.Base.friction = cmp.friction
+O.Base.rotate_friction = cmp.rotate_friction
 O.Base.collision = cmp.collision
 O.Base.hit = cmp.hit
 -- particle
-O.Base.destroy_obj = cmp.destroy_obj
+O.Base.destroy_particle = cmp.destroy_particle
 O.Base.boom = cmp.global_particle
 O.Base.local_particle = cmp.local_particle
-O.Base.particle_upd = cmp.particle_upd
 function O.Base:__tostring() return self.tag end
 
 function O.Base:draw()
-    love.graphics.draw(self.image, self.x, self.y, self.rot_ang,
+    love.graphics.draw(self.image,self.quad, self.x, self.y, self.rot_ang,
                        self.scale, self.scale, self.cenx, self.ceny)
     for particle in pairs(self.particle) do love.graphics.draw(particle) end
 end
@@ -37,23 +38,34 @@ function O.Base:update(dt)
     self:rotate_upd(dt)
     self:move_upd(dt)
     self:borders(set.WID,set.HEI)
+
+    for i=1, #self.last_collision do
+        local obj = self.last_collision[i]
+
+        if obj.tag=='aster' and self.tag~='aster' then
+            if obj:hit(self.damage,self) then obj:destroy() end
+            if self:hit(obj.damage,obj) then self:destroy() return end
+        end
+    end
 end
 
 function O.Base:destroy()
     self.model.avatar = nil
     -- fire
     self:boom(self.x, self.y, 25, {1},
-              {set.WHITEFF, set.WHITE, set.GRAYF}, set.OBJ['fire'], {0.7,1.2})
+              {set.WHITEFF, set.WHITE, set.GRAYF}, set.OBJ['fire'],
+                                                        {0.7,1.2},{1,0.1})
     -- smoke
     self:boom(self.x ,self.y, 40, {self.wid/10,self.wid/8,self.wid/6},
                        {set.DARKGRAY,set.GRAY,set.DARKGRAYF})
     -- fire
     self:boom(self.x, self.y, 80, {self.wid/16,self.wid/24},
               nil, nil, nil, nil,8000)
-    self:destroy_obj()
+    self:destroy_particle()
     set.AUD['shipboom']:play()
 
     for particle in pairs(self.particle) do particle:reset() end
+
     self.model:destroy(self)
 end
 
@@ -68,12 +80,13 @@ O.Wasp.hp = 4
 -- cmp
 O.Wasp.shot = cmp.shot
 function O.Wasp:new(o)
-    self.image, self.rect = self:set_obj(self.img_data)
+    self.model=Model
+    self:set_obj(self.img_data)
     self.destroy_data = imd.splash_imd(self.img_data, 50, 30)
 
     self.weapon = O.Bullet
     self.weapon_side = 'right'
-    self.weapon_delta = {0,7}
+    self.weapon_offset = {0,7}
 
     -- init engine particle
     self.engine1 = self:local_particle(5, {set.ORANGE,set.LIGHTGRAY,
@@ -98,15 +111,16 @@ end
 
 function O.Wasp:move(dist)
     self.Super.move(self,dist)
-    self.engine1:emit(1)
-    self.engine2:emit(1)
+    self.engine1.particle:emit(1)
+    self.engine2.particle:emit(1)
     if not dist then set.AUD['engine']:play() end
 end
 
 function O.Wasp:rotate(side)
     self.Super.rotate(self,side)
     self.Super.move(self,self.speed/10)
-    if side>0 then self.engine3:emit(1) else self.engine4:emit(1) end
+    if side>0 then self.engine3.particle:emit(1)
+    else self.engine4.particle:emit(1) end
     set.AUD['side_engine']:play()
 end
 
@@ -115,28 +129,41 @@ function O.Wasp:hit(damage)
     return self.Super.hit(self,damage)
 end
 
+function O.Wasp:stop_rotate(dt)
+    if self.auto_stop then
+        if self.rot_dt>self.rotspeed then
+            self:rotate(-0.5)
+        elseif self.rot_dt<-self.rotspeed then
+            self:rotate(0.5)
+        else
+            self:rotate_friction(dt)
+        end
+    end
+end
+
 function O.Wasp:update(dt)
     self.Super.update(self,dt)
-    self:particle_upd(dt, self.engine1, 'left' ,{-3,6}, -self.maxspeed/2)
-    self:particle_upd(dt, self.engine2, 'left', {-3,-6}, -self.maxspeed/2)
-    self:particle_upd(dt, self.engine3, 'center', {-25,-25}, -self.maxspeed/3)
-    self:particle_upd(dt, self.engine4, 'center', {-25,25}, -self.maxspeed/3)
+    self.engine1.upd(dt,'left' ,{-3,6}, -self.maxspeed/2)
+    self.engine2.upd(dt, 'left', {-3,-6}, -self.maxspeed/2)
+    self.engine3.upd(dt,'center', {-25,-25}, -self.maxspeed/3)
+    self.engine4.upd(dt,'center', {-25,25}, -self.maxspeed/3)
 
     if self.hp<4 then
-        self:particle_upd(dt, self.wounded1, 'center', self.wound1,
+        self.wounded1.upd(dt,'center',self.wound1,
                           -math.abs(self.dx+self.dy)/2)
-        self.wounded1:emit(1)
+        self.wounded1.particle:emit(1)
     end
     if self.hp<3 then
-        self:particle_upd(dt, self.wounded2,'center', self.wound2,
+        self.wounded2.upd(dt,'center', self.wound2,
                           -math.abs(self.dx+self.dy)/2)
-        self.wounded2:emit(1)
+        self.wounded2.particle:emit(1)
     end
     if self.hp<2 then
-        self:particle_upd(dt, self.wounded3,'center', self.wound3,
+        self.wounded3.upd(dt,'center', self.wound3,
                           -math.abs(self.dx+self.dy)/2)
-        self.wounded3:emit(1)
+        self.wounded3.particle:emit(1)
     end
+    self:stop_rotate(dt)
 end
 
 
@@ -151,12 +178,13 @@ O.Wing.hp = 5
 -- cmp
 O.Wing.shot=cmp.shot
 function O.Wing:new(o)
-    self.image, self.rect = self:set_obj(self.img_data)
+    self.model=Model
+    self:set_obj(self.img_data)
     self.destroy_data = imd.splash_imd(self.img_data,50,30)
 
     self.weapon = O.Rocket
     self.weapon_side = 'right'
-    self.weapon_delta = {15,0}
+    self.weapon_offset = {15,0}
 
     self.engine1 = self:local_particle(7, {set.ORANGE,set.LIGHTGRAY,
                                    set.DARKGRAYF}, nil, nil, {1,0.1})
@@ -182,16 +210,29 @@ end
 
 function O.Wing:move(dist)
     self.Super.move(self, dist)
-    self.engine1:emit(1)
-    self.engine2:emit(1)
+    self.engine1.particle:emit(1)
+    self.engine2.particle:emit(1)
     if not dist then set.AUD['engine']:play() end
 end
 
 function O.Wing:rotate(side)
     self.Super.rotate(self, side)
     self.Super.move(self, self.speed/10)
-    if side>0 then self.engine3:emit(1) else self.engine4:emit(1) end
+    if side>0 then self.engine3.particle:emit(1)
+    else self.engine4.particle:emit(1) end
     set.AUD['side_engine']:play()
+end
+
+function O.Wing:stop_rotate(dt)
+    if self.auto_stop then
+        if self.rot_dt>self.rotspeed then
+            self:rotate(-0.5)
+        elseif self.rot_dt<-self.rotspeed then
+            self:rotate(0.5)
+        else
+            self:rotate_friction(dt)
+        end
+    end
 end
 
 function O.Wing:hit(damage)
@@ -201,35 +242,37 @@ end
 
 function O.Wing:update(dt)
     self.Super.update(self,dt)
-    self:particle_upd(dt, self.engine1, 'left', {-4,3}, -self.maxspeed/2)
-    self:particle_upd(dt, self.engine2, 'left', {-4,-3}, -self.maxspeed/2)
-    self:particle_upd(dt, self.engine3, 'left', {8,13}, -self.maxspeed/3)
-    self:particle_upd(dt, self.engine4, 'left', {8,-13}, -self.maxspeed/3)
+    self.engine1.upd(dt, 'left', {-4,3}, -self.maxspeed/2)
+    self.engine2.upd(dt, 'left', {-4,-3}, -self.maxspeed/2)
+    self.engine3.upd(dt, 'left', {8,13}, -self.maxspeed/3)
+    self.engine4.upd(dt, 'left', {8,-13}, -self.maxspeed/3)
 
     if self.hp<5 then
-        self:particle_upd(dt,self.wounded1,'center',self.wound1,
+        self.wounded1.upd(dt,'center', self.wound1,
                           -math.abs(self.dx+self.dy)/2)
-        self.wounded1:emit(1)
+        self.wounded1.particle:emit(1)
     end
     if self.hp<4 then
-        self:particle_upd(dt,self.wounded1,'center',self.wound2,
+        self.wounded1.upd(dt,'center', self.wound2,
                           -math.abs(self.dx+self.dy)/2)
-        self.wounded1:emit(1)
+        self.wounded1.particle:emit(1)
     end
     if self.hp<3 then
-        self:particle_upd(dt,self.wounded2,'center',self.wound3,
+        self.wounded2.upd(dt,'center', self.wound3,
                           -math.abs(self.dx+self.dy)/2)
-        self.wounded2:emit(1)
+        self.wounded2.particle:emit(1)
     end
     if self.hp<2 then
-        self:particle_upd(dt,self.wounded3,'center',self.wound4,
+        self.wounded3.upd(dt,'center', self.wound4,
                           -math.abs(self.dx+self.dy)/2)
-        self.wounded3:emit(1)
+        self.wounded3.particle:emit(1)
     end
+
+    self:stop_rotate(dt)
 end
 
 
-O.Bullet = cls.Cls(O.Base,{tag='bullet',collider='box'})
+O.Bullet = cls.Cls(O.Base,{tag='bullet',collider={'left'}})
 -- const
 O.Bullet.img_data = set.OBJ[O.Bullet.tag]
 O.Bullet.speed = 600
@@ -237,12 +280,13 @@ O.Bullet.maxspeed = 1200
 O.Bullet.cooldown = 0.2
 O.Bullet.lifetime = 1
 O.Bullet.damage = 1
-O.Bullet.inertion = -5
+O.Bullet.kick = -5
 O.Bullet.mistake = 45
 --cmp
 O.Bullet.borders = cmp.out_scr
 function O.Bullet:new(o)
-    self.image, self.rect = self:set_obj(self.img_data)
+    self.model=Model
+    self:set_obj(self.img_data)
 
     self.dx = self.dx+love.math.random(-self.mistake, self.mistake)
     self.dy = self.dy+love.math.random(-self.mistake, self.mistake)
@@ -257,13 +301,14 @@ function O.Bullet:new(o)
 end
 
 function O.Bullet:update(dt)
-    self:move_upd(dt)
-    self.dx = self.dx-self.dx*dt
-    self.dy = self.dy-self.dy*dt
+    self.Super.update(self,dt)
+    self:friction(dt)
 
     self.lifetime = self.lifetime-dt
+    if self.lifetime<0.9 then self.bounce=true end
     if self.lifetime<0 then self:destroy() return end
     if self:borders(set.WID, set.HEI) then self.model:destroy(self) end
+
 end
 
 function O.Bullet:destroy()
@@ -282,12 +327,13 @@ O.Rocket.img_data = set.OBJ[O.Rocket.tag]
 O.Rocket.speed = 5
 O.Rocket.maxspeed = 500
 O.Rocket.cooldown = 0.9
-O.Rocket.lifetime = 3
+O.Rocket.lifetime = 2.5
 O.Rocket.damage = 3
-O.Rocket.inertion = -20
+O.Rocket.kick = -20
 O.Rocket.mistake = 4
 function O.Rocket:new(o)
-    self.image, self.rect = self:set_obj(self.img_data)
+    self.model=Model
+    self:set_obj(self.img_data)
     self.destroy_data = imd.splash_imd(self.img_data, 5, 10)
 
     self.dx = self.dx+love.math.random(-self.mistake,self.mistake)
@@ -307,18 +353,19 @@ end
 function O.Rocket:update(dt)
     self.Super.update(self,dt)
     self:move()
-    if self.lifetime<=2.5 then
-        self:particle_upd(dt, self.engine, 'left', {0,0})
-        self.engine:emit(1)
-    end
+
     self.lifetime = self.lifetime-dt
+    if self.lifetime<=2 then
+        self.engine.upd(dt,'left', {0,0})
+        self.engine.particle:emit(1)
+    end
     if self.lifetime<0 then self:destroy() end
 end
 
 function O.Rocket:destroy()
     -- fire cloud
     self:boom(self.rect.right[1], self.rect.right[2], 10, {1},
-              {set.WHITEFF,set.WHITE,set.GRAYF}, set.OBJ['fire'])
+              {set.WHITEFF,set.WHITE,set.GRAYF}, set.OBJ['fire'],nil,{1,0.1})
     -- smoke
     self:boom(self.x, self.y, 30, {self.wid/16,self.wid/8,self.wid/6},
                        {set.DARKGRAY,set.GRAY,set.DARKGRAYF})
@@ -326,7 +373,7 @@ function O.Rocket:destroy()
     self:boom(self.x, self.y, 80, {self.wid/16},
                         nil, nil, nil, nil, 4000)
 
-    self:destroy_obj({2,4}, {1,2.5}, 300)
+    self:destroy_particle({2,4}, {1,2.5}, 300)
     set.AUD['rocket_destroy']:stop()
     set.AUD['rocket_destroy']:play()
 
@@ -341,9 +388,10 @@ O.Asteroid.aster_data = imd.slice_imd(set.OBJ['aster'], 250, 250, 3)
 O.Asteroid.maxspeed = 90
 O.Asteroid.rotspeed = math.pi
 -- static cmp
-O.Asteroid.get_randpos = cmp.get_randpos
+O.Asteroid.get_randxy = cmp.get_randxy
 function O.Asteroid:new(o)
-    self.x, self.y = self.get_randpos(self.x, self.y, set.WID, set.HEI,'rand')
+    self.model=Model
+    self.x, self.y = self.get_randxy(self.x, self.y, set.WID, set.HEI,'rand')
 
     self.dx = love.math.random(-self.maxspeed, self.maxspeed)
     self.dy = love.math.random(-self.maxspeed, self.maxspeed)
@@ -358,27 +406,9 @@ function O.Asteroid:new(o)
     else
         self.img_data = self.aster_data[love.math.random(#self.aster_data)]
     end
-    self.image, self.rect = self:set_obj(self.img_data)
+    self:set_obj(self.img_data)
 
     self.model:spawn(self)
-end
-
-function O.Asteroid:update(dt)
-    self.Super.update(self,dt)
-    local objects = self.model:getobj()
-    for obj in pairs(objects) do
-        if obj.tag~='aster' and obj:collision(self,dt) then
-            if obj.tag=='bullet' or obj.tag=='rocket' then
-                obj:destroy()
-                if self:hit(obj.damage,obj) then self:destroy() return end
-            end
-            if obj.tag=='wasp' or obj.tag=='wing' then
-                self:destroy()
-                if obj:hit(self.damage) then obj:destroy() return end
-            end
-        end
-
-    end
 end
 
 function O.Asteroid:hit(damage,item)
@@ -402,7 +432,7 @@ function O.Asteroid:destroy()
     if self.size>1 then
         self.size = self.size-1
         for _=1, set.NUMASTER do
-            O.Asteroid{model=self.model, x=self.x,y=self.y, size=self.size}
+            O.Asteroid{x=self.x,y=self.y, size=self.size}
         end
     end
     self.model:destroy(self)

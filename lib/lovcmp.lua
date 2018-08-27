@@ -1,6 +1,6 @@
 ﻿#!/usr/bin/env love
 -- LOVCMP
--- 0.1
+-- 0.2
 -- Game Components (love2d)
 -- lovecmp.lua
 
@@ -25,53 +25,106 @@
 -- FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 -- DEALINGS IN THE SOFTWARE.
 
--- circle collision box
--- box rotation
--- circle rotation
--- move on the hill
--- inertion
--- border problem
-
--- 0.4
+-- 0.3
+-- rotate img when change direction
 -- per pixel collision masksb
 -- particle rotation
 -- paritcle update
+-- 0.4
+-- box rotation
+-- circle rotation hill
+-- fall bricks after center
+-- walk in hill
+-- improve inertion with weight
 -- 0.5
-
+-- border problem collide when out screen
 -- improve speed perfomance for colliders
+-- 1.0
+-- upgrade to box2d physics
+
+if arg[1] then print('0.2 LOVCMP Game Components (love2d)', arg[1]) end
 
 -- old lua version
 local unpack = table.unpack or unpack
 local utf8 = require('utf8')
 
-local DT = 0.016
-local EPSILON = 2^-31
-local CMP={}
-
+local CMP={DT = 0.017,EPSILON = 2^-31,GRAVITY = {x=0, y=1},TILESIZE=1}
 function CMP.set_obj(obj,data)
     local wid,hei = data:getDimensions()
     obj.cenx = wid/2
     obj.ceny = hei/2
     obj.wid = wid*obj.scale
     obj.hei = hei*obj.scale
-    obj.midwid = obj.wid/2
-    obj.midhei = obj.hei/2
     obj.radius = math.min(obj.wid, obj.hei)/2
+
+    obj.hp = obj.hp or 1
+    -- collision & matrix collision
+    obj.xtile=math.floor(obj.x/CMP.TILESIZE+(obj.x/CMP.TILESIZE)%1)
+    obj.ytile=math.floor(obj.y/CMP.TILESIZE+(obj.y/CMP.TILESIZE)%1)
     -- use 7.86 for steel(rect) (not real weight just example)
     obj.weight = (obj.wid*obj.hei*0.001)*7.86
     if obj.weight<1 then obj.weight=1.5 end
     obj.body = obj.body or 'dynamic'
+    if obj.bounce==nil then obj.bounce = false end
     obj.collider = obj.collider or 'box'
-    obj.particle = {}
     obj.last_collision = {}
-    local rect = CMP.get_rect(obj)
-    return love.graphics.newImage(data), rect
+    obj.particle = {}
+
+    local image = love.graphics.newImage(data)
+    image:setFilter('nearest', 'linear')
+    obj.image = image
+    obj.quad = love.graphics.newQuad(0,0,wid,hei,wid,hei)
+    obj.rect = CMP.get_rect(obj)
+end
+
+function CMP.set_sprites(obj,data,tilex,tiley,numx,numy)
+    obj.sprites = {}
+    obj.sprites.tiles = love.graphics.newImage(data)
+    obj.sprites.tiles:setFilter('nearest', 'linear')
+    obj.sprites.quads = {}
+    local sx = obj.sprites.tiles:getWidth()
+    local sy = obj.sprites.tiles:getHeight()
+    for y=0,numy-1 do
+        for x=0,numx-1 do
+            obj.sprites.quads[#obj.sprites.quads+1]=love.graphics.newQuad(
+                                tilex*x,tiley*y,tilex,tiley,sx,sy)
+        end
+    end
+
+    obj.get_sprites = function(self) return self.sprites end
+end
+
+function CMP.sprite_animation(obj,start,fin,total)
+    total=total or 1
+    fin=fin+1
+    local animation={start=start,fin=fin,total=total,elapsed=0}
+    obj.image=obj.sprites.tiles
+    animation.upd=function(dt)
+            animation.elapsed=animation.elapsed+dt
+            if animation.elapsed>=animation.total then
+                animation.elapsed=0
+            end
+            local pass=animation.elapsed/animation.total
+            local index=start+math.floor(pass*(fin-start))
+            obj.quad=obj.sprites.quads[index]
+            end
+    return animation
+end
+
+function CMP.rect_upd(obj)
+    obj.rect = CMP.get_rect(obj)
 end
 
 function CMP.move_upd(obj,dt)
-    dt = dt or DT
+    dt = dt or CMP.DT
     obj.x = obj.x+obj.dx*dt
     obj.y = obj.y+obj.dy*dt
+    obj.rect = CMP.get_rect(obj)
+end
+
+function CMP.rotate_upd(obj,dt)
+    dt = dt or CMP.DT
+    obj.rot_ang = obj.rot_ang+obj.rot_dt*dt
     obj.rect = CMP.get_rect(obj)
 end
 
@@ -89,11 +142,6 @@ function CMP.move(obj,dist)
     end
 end
 
-function CMP.rotate_upd(obj,dt)
-    dt = dt or 1
-    obj.rot_ang = obj.rot_ang+obj.rot_dt*dt
-end
-
 function CMP.rotate(obj,side)
     side = side or 0
     obj.rot_dt = obj.rot_dt+side*obj.rotspeed
@@ -103,11 +151,65 @@ function CMP.rotate(obj,side)
     end
 end
 
+function CMP.walk(obj,side,dt)
+    dt = dt or CMP.DT
+    local walk
+    if obj.collide then
+        walk = CMP.dots_collision(obj,obj.collide,
+                                  {{obj.rect.botright[1],
+                                 obj.rect.botright[2]+1},
+                                 {obj.rect.botleft[1],
+                                obj.rect.botleft[2]+1}},dt)
+        if walk then
+            obj.jump_=false
+        end
+    end
+
+    obj.y = obj.y-CMP.GRAVITY.y*obj.weight*dt
+    if not obj.jump_ then
+        if side=='right' then obj:move(obj.speed) end
+        if side=='left' then obj:move(-obj.speed) end
+    end
+
+end
+
+function CMP.jump(obj,hei)
+    hei = hei or 200
+    if not obj.jump_ then
+        obj.dy = obj.dy-10*hei/obj.weight
+        obj.jump_=true
+    end
+end
+
+function CMP.stop(obj,rotate)
+    if rotate=='rotate' then obj.rot_dt = 0
+    else
+        obj.dx,obj.dy = 0,0
+    end
+end
+
+function CMP.velocity(obj,dx,dy)
+    dx = dx or 0
+    dy = dy or 0
+    obj.dx = obj.dx + dx
+    obj.dy = obj.dy + dy
+end
+
+function CMP.friction(obj,dt)
+    dt = dt or CMP.DT
+    obj.dx = obj.dx-obj.dx*dt
+    obj.dy = obj.dy-obj.dy*dt
+end
+
+function CMP.rotate_friction(obj,dt)
+    dt = dt or CMP.DT
+    obj.rot_dt = obj.rot_dt-obj.rot_dt*dt
+end
+
 function CMP.circle_view(obj,x,y)
     x=x or obj.x
     y=y or obj.y
     local maxview = obj.viewrange or obj.radius
-    love.graphics.circle('line',obj.x,obj.y,maxview)
     if CMP.get_dotincircle(x,y,{obj.x,obj.y},maxview) then
         return true
     end
@@ -131,13 +233,15 @@ function CMP.sector_view(obj,x,y)
     local sides = {{{cenx,ceny},{x1,y1}},
                         {{x1,y1},{x2,y2}},
                             {{x2,y2},{cenx,ceny}}}
-    local sq_view = CMP.get_vec2mul({x1,y1},{x2,y2})/2
+    local sq_view = CMP.get_vec2mulvec({x1,y1},{x2,y2},{cenx,ceny})/2
+
     local sq_tri = 0
     for i=1, #sides do
         local s = sides[i]
-        sq_tri = sq_tri+CMP.get_vec2mul(s[1],s[2],{x,y})/2
+        sq_tri = sq_tri+CMP.get_vec2mulvec(s[1],s[2],{x,y})/2
     end
-    if sq_tri<=sq_view and CMP.circle_view(obj,x,y) then
+
+    if sq_tri<=sq_view then
         return {x1,y1},{x2,y2}
     end
 end
@@ -154,61 +258,25 @@ function CMP.out_scr(obj,widscr,heiscr)
 end
 
 
-function CMP.shot(obj,side,weapon_delta,inertion)
-    weapon_delta = weapon_delta or {0,0}
+function CMP.shot(obj,side,weapon_offset,inertion)
+    weapon_offset = weapon_offset or {0,0}
     inertion = inertion or 0
     local x,y = CMP.get_side(obj.rect[side][1],
-                             obj.rect[side][2], obj.rot_ang, weapon_delta)
-
-    obj.weapon{model=obj.model, x=x,y=y, dx=obj.dx, dy=obj.dy,
-                                rot_ang=obj.rot_ang}
+                             obj.rect[side][2], obj.rot_ang, weapon_offset)
+    obj.weapon{x=x,y=y,rot_ang=obj.rot_ang,
+                        dx=obj.dx, dy=obj.dy, rot_dt=0, scale=obj.scale}
     if obj.move then obj:move(inertion) end
 end
 
 function CMP.hit(obj,damage)
-    obj.hp = obj.hp-damage
-    return obj.hp<=0
-end
-
-function CMP.destroy_obj(obj,maxnum,time,accel)
-    maxnum = maxnum or {3,5}
-    local nx,ny = unpack(maxnum)
-    local numx = love.math.random(nx,ny)
-    local numy = love.math.random(nx+1,ny+1)
-    local destroy_data = obj.destroy_data or obj.img_data
-    local sx, sy = destroy_data:getDimensions()
-
-    local arr = {}
-    local tilex,tiley = sx/numx,sy/numy
-    time = time or {15,30}
-    accel = accel or 40
-    for i=0,numx-1 do
-        for j=0,numy-1 do
-            local data = love.image.newImageData(tilex,tiley)
-            data:paste(destroy_data, 0, 0, i*tilex, j*tiley, sx, sy)
-            arr[#arr+1] = data
-        end
+    damage = damage or 1
+    if type(obj.hp)=='table' then
+        obj.hp.val = obj.hp.val-damage
+        return obj.hp.val<=0
+    else
+        obj.hp = obj.hp-damage
+        return obj.hp<=0
     end
-    for i=1,#arr do
-        if love.math.random(0,1)==1 then
-            local scale = {obj.scale, obj.scale+love.math.random(-1,1)*0.2}
-            CMP.global_particle(obj, obj.x, obj.y, 1, nil,
-                                {{1,1,1,1}, {1,1,1,0}},
-                                arr[i], time, scale, accel)
-        end
-    end
-end
-
-function CMP.particle_upd(obj,dt,particle,side,delta,speed)
-    side = side or 'center'
-    delta = delta or {0,0}
-    speed = speed or 0
-    local x,y = CMP.get_side(obj.rect[side][1], obj.rect[side][2],
-                             obj.rot_ang,delta)
-    particle:setPosition(x, y)
-    particle:setSpeed(speed)
-    particle:setDirection(obj.rot_ang)
-    particle:update(dt)
 end
 
 function CMP.get_particle(shsize,shtype)
@@ -251,7 +319,7 @@ function CMP.global_particle(obj,x,y,num,shsize,clrs,shtype,time,ptsize,accel)
 
     for i=1, #shsize do
         local image = CMP.get_particle(shsize[i],shtype)
-        local particle = love.graphics.newParticleSystem(image, 100)
+        local particle = love.graphics.newParticleSystem(image, 300)
         particle:setParticleLifetime(unpack(time))
         particle:setLinearAcceleration(unpack(accel))
         particle:setColors(unpack(grad))
@@ -280,7 +348,7 @@ function CMP.local_particle(obj,shsize,clrs,shtype,time,ptsize,accel)
     accel = accel or {-40,-40,40,40}
 
     local image = CMP.get_particle(shsize,shtype)
-    local particle = love.graphics.newParticleSystem(image, 100)
+    local particle = love.graphics.newParticleSystem(image, 300)
     particle:setParticleLifetime(unpack(time))
     particle:setLinearAcceleration(unpack(accel))
     particle:setColors(unpack(grad))
@@ -289,15 +357,60 @@ function CMP.local_particle(obj,shsize,clrs,shtype,time,ptsize,accel)
     particle:setRotation(0.5, 1)
     particle:setSpin(0.1, 0.5)
     obj.particle[particle] = particle
-    return particle
+
+    local local_particle={['particle']=particle}
+    function local_particle.upd(dt,side,offset,speed)
+        side = side or 'center'
+        offset = offset or {0,0}
+        speed = speed or 0
+        local x,y = CMP.get_side(obj.rect[side][1], obj.rect[side][2],
+                                 obj.rot_ang,offset)
+        local_particle.particle:setPosition(x, y)
+        local_particle.particle:setSpeed(speed)
+        local_particle.particle:setDirection(obj.rot_ang)
+        local_particle.particle:update(dt)
+    end
+    return local_particle
+end
+
+function CMP.destroy_particle(obj,maxnum,time,accel)
+    maxnum = maxnum or {3,5}
+    local nx,ny = unpack(maxnum)
+    local numx = love.math.random(nx,ny)
+    local numy = love.math.random(nx+1,ny+1)
+    local destroy_data = obj.destroy_data or obj.img_data
+    local sx, sy = destroy_data:getDimensions()
+
+    local arr = {}
+    local tilex,tiley = sx/numx,sy/numy
+    time = time or {15,30}
+    accel = accel or 40
+    for i=0,numx-1 do
+        for j=0,numy-1 do
+            local data = love.image.newImageData(tilex,tiley)
+            data:paste(destroy_data, 0, 0, i*tilex, j*tiley, sx, sy)
+            arr[#arr+1] = data
+        end
+    end
+    for i=1,#arr do
+        if love.math.random(0,1)==1 then
+            local scale = {obj.scale, obj.scale+love.math.random(-1,1)*0.2}
+            CMP.global_particle(obj, obj.x, obj.y, 1, nil,
+                                {{1,1,1,1}, {1,1,1,0}},
+                                arr[i], time, scale, accel)
+        end
+    end
 end
 
 function CMP.get_rect(obj)
     local cosx,siny = CMP.get_cos_sin(obj.rot_ang)
-    local horx = cosx*obj.midwid
-    local hory = siny*obj.midwid
-    local verx = cosx*obj.midhei
-    local very = siny*obj.midhei
+    local wid,hei = obj.img_data:getDimensions()
+    local midwid=(wid*obj.scale)/2
+    local midhei=(hei*obj.scale)/2
+    local horx = cosx*midwid
+    local hory = siny*midwid
+    local verx = cosx*midhei
+    local very = siny*midhei
 
     return {topleft = {obj.x-horx+very, obj.y-hory-verx},
             top = {obj.x+very, obj.y-verx},
@@ -310,242 +423,19 @@ function CMP.get_rect(obj)
             center = {obj.x, obj.y}}
 end
 
-function CMP.collision(obj1,obj2,dt)
-    dt = dt or DT
-
-    if obj1~=obj2 and obj1.body=='dynamic' then
-        if obj1.collider=='box' then
-            return CMP.box_collision(obj1,obj2,dt)
-        end
-        if obj1.collider=='circle' then
-            return CMP.circle_collision(obj1,obj2,dt)
-        end
-        -- dot collider
-        local dots = {}
-        for i=1, #obj1.collider do
-            if obj1.rect[obj1.collider[i]] then
-                dots[#dots+1] = obj1.rect[obj1.collider[i]]
-            end
-        end
-        if dots then return CMP.dots_collision(obj1,obj2,dt,dots) end
-    end
+function CMP.get_side(sidex,sidey,angle,offset)
+    local cosx,siny = CMP.get_cos_sin(angle)
+    local horx = cosx*offset[1]
+    local hory = siny*offset[1]
+    local verx = cosx*offset[2]
+    local very = siny*offset[2]
+    local x,y
+    x = sidex+horx-very
+    y = sidey+hory+verx
+    return x,y
 end
 
-function CMP.base_box_collision(obj1,obj2,dots,dt)
-    local sides = {{obj2.rect.topleft, obj2.rect.topright},
-                    {obj2.rect.topright, obj2.rect.botright},
-                    {obj2.rect.botright, obj2.rect.botleft},
-                    {obj2.rect.botleft, obj2.rect.topleft}}
-
-    local sq_box=obj2.wid*obj2.hei
-    for _,d in pairs(dots) do
-        local newx = d[1]+obj1.dx*dt
-        local newy = d[2]+obj1.dy*dt
-        local sq_tri=0
-        local delta,dst,dot
-        for i=1,#sides do
-            local s = sides[i]
-            sq_tri = sq_tri+CMP.get_vec2mul(s[1],s[2],{newx,newy})/2
-            local inter = CMP.get_dot_lines({newx,newy},d,s[1],s[2])
-            if inter then
-                delta,dst,dot=CMP.base_correction(inter,delta,dst,d)
-            end
-        end
-
-        if sq_tri<=sq_box+1 then
-            if delta and (obj1.dx>obj1.weight or obj1.dy>obj1.weight) then
-                obj1.x = delta[1]+obj1.x-dot[1]
-                obj1.y = delta[2]+obj1.y-dot[2]
-            end
-            return true
-        end
-    end
-end
-
-function CMP.base_circle_collision(obj1,obj2,dots,dt)
-    for _,d in pairs(dots) do
-        local newx = d[1]+obj1.dx*dt
-        local newy = d[2]+obj1.dy*dt
-        if CMP.get_dotincircle(newx,newy,{obj2.x,obj2.y},obj2.radius) then
-            local dot_in = CMP.get_dot_line_circle({newx,newy},
-                                {d[1],d[2]},{obj2.x,obj2.y},obj2.radius)
-
-            local delta,dst,dot
-            for _,inter in pairs(dot_in) do
-                if inter[1] and inter[2] then
-                    delta,dst,dot=CMP.base_correction(inter,delta,dst,d)
-                end
-            end
-            print(obj1.x,obj1.y)
-            if delta and (obj1.dx>obj1.weight or obj1.dy>obj1.weight) then
-                obj1.x = delta[1]+obj1.x-dot[1]
-                obj1.y = delta[2]+obj1.y-dot[2]
-            end
-            print(obj1.x,obj1.y)
-            return true
-        end
-    end
-end
-
-function CMP.box_collision(obj1,obj2,dt)
-    local dots = obj1.rect
-    if obj2.collider=='circle' then
-        if CMP.base_circle_collision(obj1,obj2,dots,dt) then
-            CMP.bounce(obj1,obj2,dt)
-            obj1.last_collision[#obj1.last_collision+1]=obj2
-            return true
-        end
-    elseif obj2.collider=='box' then
-        if  CMP.base_box_collision(obj1,obj2,dots,dt) then
-            CMP.bounce(obj1,obj2,dt)
-            obj1.last_collision[#obj1.last_collision+1]=obj2
-            return true
-        end
-    end
-end
-
-function CMP.circle_collision(obj1,obj2,dt)
-    if obj2.collider=='box' then
-        local dots = {}
-        local sides = {{obj2.rect.topleft, obj2.rect.topright},
-                    {obj2.rect.topright, obj2.rect.botright},
-                    {obj2.rect.botright, obj2.rect.botleft},
-                    {obj2.rect.botleft, obj2.rect.topleft}}
-        for _,s in pairs(sides) do
-            local vec = CMP.get_vec2norm(s[1],s[2])
-            local cosvx,sinvy = CMP.get_direction(0,0,vec[1],vec[2])
-
-            dots[#dots+1] = {obj1.x+cosvx*obj1.radius,
-                                 obj1.y+sinvy*obj1.radius}
-        end
-        if CMP.base_box_collision(obj1,obj2,dots,dt) then
-            CMP.bounce(obj1,obj2,dt)
-            obj1.last_collision[#obj1.last_collision+1]=obj2
-            return true
-        end
-
-    elseif obj2.collider=='circle' then
-        local cosx,siny = CMP.get_direction(obj1.x,obj1.y,obj2.x,obj2.y)
-        local dots = {{obj1.x+cosx*obj1.radius, obj1.y+siny*obj1.radius}}
-
-        if CMP.base_circle_collision(obj1,obj2,dots,dt) then
-            CMP.bounce(obj1,obj2,dt)
-            obj1.last_collision[#obj1.last_collision+1]=obj2
-            return true
-        end
-    end
-end
-
-function CMP.dots_collision(obj1,obj2,dt,dots)
-    if obj2.collider=='circle'  then
-        if CMP.base_circle_collision(obj1,obj2,dots,dt) then
-            CMP.bounce(obj1,obj2,dt)
-            obj1.last_collision[#obj1.last_collision+1]=obj2
-            return true
-        end
-    else
-        if CMP.base_box_collision(obj1,obj2,dots,dt) then
-            CMP.bounce(obj1,obj2,dt)
-            obj1.last_collision[#obj1.last_collision+1]=obj2
-            return true
-        end
-    end
-end
-
-function CMP.box_correction(obj1,obj2,dt,dot)
-
-    if side then
-        -- correct rotation
-        local side_norm = CMP.get_vec2norm({side[1][1],side[1][2]},
-                                               {side[2][1],side[2][2]})
-        local cosv,sinv = CMP.get_direction(0,0,side_norm[1],side_norm[2])
-
-        local next_dot = dot
-        local dist_side = nil
-        local sides_obj1 = {{obj1.rect.topleft, obj1.rect.topright},
-                        {obj1.rect.topright, obj1.rect.botright},
-                        {obj1.rect.botright, obj1.rect.botleft},
-                        {obj1.rect.botleft, obj1.rect.topleft}}
-
-        for i=1,#sides_obj1 do
-            local s = sides_obj1[i]
-            local d1,d2
-            if dot==s[1] then
-                d1 = CMP.get_hypot(s[2][1],s[2][2],
-                                         s[2][1]*cosv,s[2][2]*sinv)
-                if not dist_side then
-                    dist_side=d1
-                    next_dot = s[2]
-                end
-                if d1<dist_side then dist_side=d1 next_dot = s[2] end
-            end
-            if  dot==s[2] then
-                d2 = CMP.get_hypot(s[1][1],s[1][2],
-                                         s[2][1]*cosv,s[2][2]*sinv)
-                if not dist_side then
-                    dist_side=d2
-                    next_dot = s[1]
-                end
-                if d2<dist_side then dist_side=d2 next_dot = s[1] end
-            end
-        end
-
-        local dot_norm = CMP.get_vec2norm({dot[1],dot[2]},
-                                          {next_dot[1],next_dot[2]})
-
-        if math.abs(dot_norm[1])>1 and math.abs(dot_norm[2])>1 then
-            -- print('rotate')
-            -- print(dot_norm[1],dot_norm[2])
-
-            if next_dot[1]<obj1.x then
-                obj1.rot_dt=obj1.rot_dt+dt
-            else
-                obj1.rot_dt=obj1.rot_dt-dt
-            end
-        else
-            -- print(obj1.rot_dt)
-            obj1.rot_dt=0
-        end
-    end
-end
-
-function CMP.base_correction(inter,delta,dist,dot)
-    local hypot = CMP.get_hypot(dot[1],dot[2],inter[1],inter[2])
-    if not dist then
-        dist = hypot
-        delta = inter
-    end
-    if hypot<dist then
-        dist = hypot
-        delta = inter
-    end
-    return delta,dist,dot
-end
-
-function CMP.bounce(obj1,obj2,dt)
-    local old1dx = obj1.dx
-    local old1dy = obj1.dy
-    local bounce = math.max(math.abs(obj1.dx),math.abs(obj1.dy))
-
-    if bounce==math.abs(old1dx) then
-        obj1.dx = -old1dx/obj1.weight
-        obj1.dy = old1dy
-        if obj2.body=='dynamic' and math.abs(old1dx)>obj2.weight then
-            obj2.dx = old1dx/obj2.weight
-        end
-    else
-        obj1.dx = old1dx
-        obj1.dy = -old1dy/obj1.weight
-        if obj2.body=='dynamic' and math.abs(old1dy)>obj2.weight then
-            obj2.dy = old1dy/obj2.weight
-        end
-    end
-
-    if math.abs(obj1.dx*dt)<0.5 then obj1.dx=0 end
-    if math.abs(obj1.dy*dt)<0.5 then obj1.dy=0 end
-end
-
-function CMP.get_randpos(x,y,widscr,heiscr,side)
+function CMP.get_randxy(x,y,widscr,heiscr,side)
     if x and y then
         x,y = x,y
     else
@@ -571,35 +461,380 @@ function CMP.get_randpos(x,y,widscr,heiscr,side)
     return x,y
 end
 
+function CMP.get_goal(obj,matrix,oldgoal,viewrange,empty,target)
+    local cells = {{-1,0},{1,0},{0,-1},{0,1},{-1,-1},{1,1},{1,-1},{-1,1}}
+    local maxview = 0
+    local goal = nil
+
+    for i=1,#cells do
+        local tmpview=0
+        local tmpgoal = {}
+        local xx,yy
+        for view=1,viewrange do
+            xx=obj.xtile+cells[i][1]*view
+            yy=obj.ytile+cells[i][2]*view
+            for tar=1,#target do
+                if matrix[yy][xx] == target[tar] then return {xx,yy} end
+            end
+            if matrix[yy][xx] ~= empty then break end
+            for old=1,#oldgoal do
+                if xx==oldgoal[old][1] and yy==oldgoal[old][2] then
+                    goto continue
+                end
+            end
+            tmpview=tmpview+1
+            tmpgoal = {xx,yy}
+            ::continue::
+        end
+        if tmpview>maxview then
+            maxview = tmpview
+            goal=tmpgoal
+        end
+    end
+    return goal
+end
+
+function CMP.get_emptytile(matrix,tile,wall)
+    local xtile,ytile=tile[1],tile[2]
+    local wid,hei=#matrix[1],#matrix
+    local cells = {{1,0},{0,1},{-1,0},{0,-1}}
+    local side = {'right','down','left','up'}
+    local empty={}
+    for i=1,#cells do
+        local x=xtile+cells[i][1]
+        local y=ytile+cells[i][2]
+        if x>0 and x<=wid and y>0 and y<=hei then
+            if matrix[y][x]~=wall then
+                empty[#empty+1]=side[i]
+            end
+        end
+    end
+    return empty
+end
+
+function CMP.get_path(matrix,sign,last)
+    local path = {last}
+    local wid = #matrix[1]
+    local hei = #matrix
+    local cells = {{-1,0},{1,0},{0,-1},{0,1}}
+    for s=sign,2,-1 do
+        for c=1,#cells do
+            local xx = path[#path][1]+cells[c][1]
+            local yy = path[#path][2]+cells[c][2]
+            if xx>=1 and xx<=wid and yy>=1 and yy<=hei then
+                if matrix[yy][xx]==s-1 then
+                    path[#path+1] = {xx,yy}
+                    break
+                end
+            end
+        end
+    end
+    return path
+end
+
+function CMP.get_wave(matrix,wave,goal,empty,sign,target)
+    local wid = #matrix[1]
+    local hei = #matrix
+
+    local freecell = 0
+    for s=#wave,1,-1 do
+        local x,y=wave[s][1],wave[s][2]
+        local cells = {{-1,0},{1,0},{0,-1},{0,1}}
+        for c=1,#cells do
+            local xx = x+cells[c][1]
+            local yy = y+cells[c][2]
+            if xx>=1 and xx<=wid and yy>=1 and yy<=hei then
+                local alltags = {empty,unpack(target)}
+                for i=1,#alltags do
+                    if matrix[yy][xx]==alltags[i] then
+                        freecell=freecell+1
+                        wave[#wave+1] = {xx,yy}
+                        matrix[yy][xx] = sign
+                    end
+                end
+
+                if xx == goal[1] and yy==goal[2] then
+                    return matrix,sign,goal
+                end
+            end
+        end
+    end
+
+    if freecell>0 then
+        return CMP.get_wave(matrix,wave,goal,empty,sign+1,target)
+    else
+        return matrix,sign,wave[#wave]
+    end
+end
+
+function CMP.matrix_pathfinder(obj,matrix,step,goal,empty,target)
+    goal = goal or obj.goal or {obj.xtile,obj.ytile}
+
+    if step[1][1]==goal[1] and step[1][2]==goal[2] then
+        obj.goal = nil
+        return step
+    end
+
+    local clone = {}
+    for row=1,#matrix do
+        clone[row] = {}
+        for col=1,#matrix[1] do
+            clone[row][col]=matrix[row][col]
+        end
+    end
+
+    local wavematrix,sign,last = CMP.get_wave(clone,step,goal,empty,1,target)
+    local path = CMP.get_path(wavematrix,sign,last)
+    return path
+end
+
+function CMP.matrix_collision(obj,matrix,tilesize)
+    tilesize = tilesize or CMP.TILESIZE
+    local dx,dy=obj.dx,obj.dy
+    dx=math.floor(dx/tilesize)
+    dy=math.floor(dy/tilesize)
+    if math.abs(obj.dx)<CMP.TILESIZE then dx=0 end
+    if math.abs(obj.dy)<CMP.TILESIZE then dy=0 end
+
+    local tile = matrix[obj.ytile+dy][obj.xtile+dx]
+    obj.last_collision[#obj.last_collision+1]={tile=tile,dx=dx,dy=dy}
+end
+
+function CMP.collision(obj1,obj2,dt)
+    dt = dt or CMP.DT
+    if obj1~=obj2 and obj1.body=='dynamic' then
+        if obj1.collider=='box' then
+            CMP.box_collision(obj1,obj2,dt)
+        end
+        if obj1.collider=='circle' then
+            CMP.circle_collision(obj1,obj2,dt)
+        end
+
+        local dots = {}
+        for i=1, #obj1.collider do
+            if obj1.rect[obj1.collider[i]] then
+                dots[#dots+1] = obj1.rect[obj1.collider[i]]
+            end
+        end
+        if dots then CMP.dots_collision(obj1,obj2,dots,dt) end
+    end
+end
+
+function CMP.base_box_collision(obj1,obj2,dots,dt)
+    local sides = {{obj2.rect.topleft, obj2.rect.topright},
+                    {obj2.rect.topright, obj2.rect.botright},
+                    {obj2.rect.botright, obj2.rect.botleft},
+                    {obj2.rect.botleft, obj2.rect.topleft}}
+
+    local sq_box=obj2.wid*obj2.hei
+    for _,d in pairs(dots) do
+        local newx = d[1]+obj1.dx*dt
+        local newy = d[2]+obj1.dy*dt
+        local sq_tri=0
+
+        for i=1,#sides do
+            local s = sides[i]
+            sq_tri = sq_tri+CMP.get_vec2mulvec(s[1],s[2],{newx,newy})/2
+        end
+
+        if sq_tri<=sq_box+1 then
+            local offset,dst,side
+            for i=1,#sides do
+                local s = sides[i]
+                local inter = CMP.get_dotlines({newx,newy},d,s[1],s[2])
+                if inter then
+                    offset,dst,side=CMP.get_correction(inter,offset,
+                                                        dst,d,s,side)
+                end
+            end
+
+            if offset and obj1.bounce then
+                obj1.x = offset[1]+obj1.x-d[1]
+                obj1.y = offset[2]+obj1.y-d[2]
+            end
+
+            if side and obj1.bounce then
+                -- use for bounce
+                local side_norm = CMP.get_vec2to90(CMP.get_vec2dots(
+                                side[1][1],side[1][2],side[2][1],side[2][2]))
+
+                local vector = CMP.get_vec2dots(d[1],d[2],newx,newy)
+                local bounce = CMP.get_vec2bounce(vector,side_norm)
+                CMP.set_bounce(obj1,obj2,bounce)
+            end
+
+            obj1.last_collision[#obj1.last_collision+1]=obj2
+            obj2.last_collision[#obj2.last_collision+1]=obj1
+        end
+    end
+end
+
+function CMP.base_circle_collision(obj1,obj2,dots,dt)
+    local cosx,siny = CMP.get_direction(obj1.x,obj1.y,obj2.x,obj2.y)
+
+    local old1x = obj1.x
+    local old1y = obj1.y
+    -- circle correction
+    if obj1.bounce then
+        local doubleradius = obj1.radius+obj2.radius
+        local distance = CMP.get_hypot(obj1.x,obj1.y,obj2.x,obj2.y)
+        if doubleradius>=distance then
+            local correction = doubleradius-distance
+            obj1.x=obj1.x+cosx*-correction
+            obj1.y=obj1.y+siny*-correction
+        end
+    end
+    for _,d in pairs(dots) do
+        local newx = d[1]+obj1.dx*dt
+        local newy = d[2]+obj1.dy*dt
+        if CMP.get_dotincircle(newx,newy,{obj2.x,obj2.y},obj2.radius) then
+            if obj1.bounce then
+                local side_norm = CMP.get_vec2dots(old1x,old1y,obj2.x,obj2.y)
+
+                local vector = CMP.get_vec2dots(obj1.x,obj1.y,newx,newy)
+                local bounce = CMP.get_vec2bounce(vector,side_norm)
+                CMP.set_bounce(obj1,obj2,bounce)
+            end
+
+            obj1.last_collision[#obj1.last_collision+1]=obj2
+            obj2.last_collision[#obj2.last_collision+1]=obj1
+        end
+    end
+end
+
+function CMP.box_collision(obj1,obj2,dt)
+    local dots = obj1.rect
+    if obj2.collider=='circle' then
+        CMP.base_circle_collision(obj1,obj2,dots,dt)
+    elseif obj2.collider=='box' then
+       CMP.base_box_collision(obj1,obj2,dots,dt)
+    end
+end
+
+function CMP.circle_collision(obj1,obj2,dt)
+    local cosx,siny = CMP.get_direction(obj1.x,obj1.y,obj2.x,obj2.y)
+    local dots = {{obj1.x+cosx*obj1.radius, obj1.y+siny*obj1.radius}}
+    if obj2.collider=='box' then
+        local sides = {{obj2.rect.topleft, obj2.rect.topright},
+                    {obj2.rect.topright, obj2.rect.botright},
+                    {obj2.rect.botright, obj2.rect.botleft},
+                    {obj2.rect.botleft, obj2.rect.topleft}}
+        for _,s in pairs(sides) do
+            local vec = CMP.get_vec2to90(CMP.get_vec2dots(
+                                        s[1][1],s[1][2],s[2][1],s[2][2]))
+            cosx,siny = CMP.get_direction(0,0,vec[1],vec[2])
+
+            dots[#dots+1] = {obj1.x+cosx*obj1.radius,
+                                 obj1.y+siny*obj1.radius}
+        end
+        CMP.base_box_collision(obj1,obj2,dots,dt)
+
+    elseif obj2.collider=='circle' then
+        CMP.base_circle_collision(obj1,obj2,dots,dt)
+    end
+end
+
+function CMP.dots_collision(obj1,obj2,dots,dt)
+    if obj2.collider=='box'  then
+        CMP.base_box_collision(obj1,obj2,dots,dt)
+    else
+        CMP.base_circle_collision(obj1,obj2,dots,dt)
+    end
+end
+
+function CMP.get_correction(inter,offset,dist,dot,s,side)
+    local hypot = CMP.get_hypot(dot[1],dot[2],inter[1],inter[2])
+    if not dist then
+        dist = hypot
+        offset = inter
+        side = s
+    end
+    if hypot<dist then
+        dist = hypot
+        offset = inter
+        side = s
+    end
+    return offset,dist,side
+end
+
+function CMP.set_bounce(obj1,obj2,bounce)
+    local old1dx = obj1.dx
+    local old1dy = obj1.dy
+
+    local dist = CMP.get_hypot(0,0,obj1.dx/obj1.weight,obj1.dy/obj1.weight)
+
+    obj1.dx=dist*bounce[1]
+    obj1.dy=dist*bounce[2]
+
+    local weightx, weighty = 1, 1
+    if CMP.GRAVITY.x > 0 then weightx = CMP.GRAVITY.x end
+    if CMP.GRAVITY.y > 0 then weighty = CMP.GRAVITY.y end
+
+    local divw = weightx*obj2.weight/2
+    if divw<=1 then divw=1.1 end
+
+    if (obj2.body=='dynamic' and
+        math.abs(old1dx)>=weightx*obj2.weight) then
+        obj2.dx = old1dx/divw
+    end
+    if (obj2.body=='dynamic' and
+        math.abs(old1dy)>=weighty*obj2.weight) then
+        obj2.dy = old1dy/divw
+    end
+end
+
 function CMP.get_cos_sin(angle)
     local cosx = math.cos(angle)
-    local cosy = math.sin(angle)
-    return cosx,cosy
+    local siny = math.sin(angle)
+    return cosx,siny
 end
 
-function CMP.get_side(sidex,sidey,angle,delta)
-    local cosx,siny = CMP.get_cos_sin(angle)
-    local horx = cosx*delta[1]
-    local hory = siny*delta[1]
-    local verx = cosx*delta[2]
-    local very = siny*delta[2]
-    local x,y
-    x = sidex+horx-very
-    y = sidey+hory+verx
-    return x,y
+function CMP.get_direction(x1,y1,x2,y2)
+    local oldhyp = CMP.get_hypot(x1,y1,x2,y2)
+    return (x2-x1)/oldhyp,(y2-y1)/oldhyp
 end
 
-function CMP.get_vec2mul(v1,v2,delta)
-    delta = delta or {0,0}
-    local delta_v1 = {v1[1]-delta[1],v1[2]-delta[2]}
-    local delta_v2 = {v2[1]-delta[1],v2[2]-delta[2]}
-    return math.abs(delta_v1[1]*delta_v2[2]-delta_v1[2]*delta_v2[1])
+function CMP.get_hypot(x1,y1,x2,y2)
+    return ((x2-x1)^2+(y2-y1)^2)^0.5
 end
 
-function CMP.get_vec2norm(v1,v2)
-    local x1,y1 = unpack(v1)
-    local xx1,yy1 = unpack(v2)
-    return {y1-yy1,xx1-x1}
+function CMP.get_vec2dots(x1,y1,x2,y2)
+    return CMP.get_vec2normalize({x2-x1,y2-y1})
+end
+
+function CMP.get_vec2add(v1,v2)
+    return {v1[1]+v2[1],v1[2]+v2[2]}
+end
+
+function CMP.get_vec2mulnum(v,num)
+    return {v[1]*num,v[2]*num}
+end
+
+function CMP.get_vec2mulvec(v1,v2,offset)
+    offset = offset or {0,0}
+    local offset_v1 = {v1[1]-offset[1],v1[2]-offset[2]}
+    local offset_v2 = {v2[1]-offset[1],v2[2]-offset[2]}
+    return math.abs(offset_v1[1]*offset_v2[2]-offset_v1[2]*offset_v2[1])
+end
+
+function CMP.get_vec2mulscal(v1,v2)
+    return v1[1]*v2[1] + v1[2]*v2[2]
+end
+
+function CMP.get_vec2to90(v)
+    return CMP.get_vec2normalize({v[2],-v[1]})
+end
+
+function CMP.get_vec2normalize(v)
+    local lenght = CMP.get_hypot(0,0,v[1],v[2])
+    return {v[1]/lenght,v[2]/lenght}
+end
+
+function CMP.get_vec2bounce(v,n)
+    -- r = v-2*(v*n)*n
+    local vnum = -2*CMP.get_vec2mulscal(v,n)
+    local vmul = CMP.get_vec2mulnum(n,vnum)
+    return CMP.get_vec2add(v,vmul)
 end
 
 function CMP.get_sqtri(a,b,c)
@@ -607,22 +842,29 @@ function CMP.get_sqtri(a,b,c)
     return (p*(p-a)*(p-b)*(p-c))^0.5
 end
 
+function CMP.get_volcone(hei,angle)
+    angle=(math.pi-angle)/2
+    local hypot = hei/math.sin(angle)
+    local radius=(hypot^2-hei^2)
+    return math.pi*radius*hei/3
+end
+
 function CMP.get_dotinline(x,y,a1,a2)
     local x1,y1 = unpack(a1)
     local xx1,yy1 = unpack(a2)
     local k = (yy1-y1)/(xx1-x1)
     if yy1-y1==0 or xx1-x1==0 then return true end
-    return y-(k*(x-x1)+y1)<=EPSILON
+    return y-(k*(x-x1)+y1)<=CMP.EPSILON
 end
 
 function CMP.get_dotincircle(x,y,cen,radius,edge)
     edge=edge or false
     if edge then
-        return radius-CMP.get_hypot(x,y,cen[1],cen[2])<EPSILON end
-    return CMP.get_hypot(x,y,cen[1],cen[2])<=radius+EPSILON
+        return radius-CMP.get_hypot(x,y,cen[1],cen[2])<CMP.EPSILON end
+    return CMP.get_hypot(x,y,cen[1],cen[2])<=radius+CMP.EPSILON
 end
 
-function CMP.get_dot_lines(a1,a2,b1,b2)
+function CMP.get_dotlines(a1,a2,b1,b2)
     local x1,y1 = unpack(a1)
     local xx1,yy1 = unpack(a2)
     local x2,y2 = unpack(b1)
@@ -638,7 +880,7 @@ function CMP.get_dot_lines(a1,a2,b1,b2)
     end
 end
 
-function CMP.get_dot_line_circle(a1,a2,cen,radius)
+function CMP.get_dot_linecircle(a1,a2,cen,radius)
     local x1,y1 = unpack(a1)
     local xx1,yy1 = unpack(a2)
     local k = (yy1-y1)/(xx1-x1)
@@ -673,7 +915,6 @@ function CMP.get_dot_line_circle(a1,a2,cen,radius)
     end
 end
 
-
 function CMP.get_root(a,b,c)
     local D = b^2-4*a*c
     if a then
@@ -686,15 +927,6 @@ function CMP.get_root(a,b,c)
         return -c/b,nil
     else return nil,nil
     end
-end
-
-function CMP.get_direction(x1,y1,x2,y2)
-    local oldhyp = CMP.get_hypot(x1,y1,x2,y2)
-    return (x2-x1)/oldhyp,(y2-y1)/oldhyp
-end
-
-function CMP.get_hypot(x1,y1,x2,y2)
-    return ((x2-x1)^2+(y2-y1)^2)^0.5
 end
 
 return CMP

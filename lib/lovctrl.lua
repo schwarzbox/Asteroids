@@ -25,8 +25,14 @@
 -- FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 -- DEALINGS IN THE SOFTWARE.
 
-local Ctrl = {}
-function Ctrl:new()
+if arg[1] then print('3.0 LOVCTRL Controller (love2d)', arg[1]) end
+
+-- old lua version
+local unpack = table.unpack or unpack
+local utf8 = require('utf8')
+
+local CTRL = {}
+function CTRL:new()
     self.actions = {}
     self.press_event = {}
     self.release_event = {}
@@ -57,13 +63,13 @@ function Ctrl:new()
     end
 end
 
-function Ctrl:bind(key,action,func)
+function CTRL:bind(key,action,func)
     self.actions[action] = key
     if func then self.func[action] = func end
     if key:find('+') then self.combos[key] = key end
 end
 
-function Ctrl:unbind(key)
+function CTRL:unbind(key)
     if key=='all' then
         self.actions={} self.func={} self.combos={}
         return
@@ -77,9 +83,9 @@ function Ctrl:unbind(key)
     end
 end
 
-function Ctrl:keyrepeat(bool) love.keyboard.setKeyRepeat(bool) end
+function CTRL:keyrepeat(bool) love.keyboard.setKeyRepeat(bool) end
 
-function Ctrl:move(action)
+function CTRL:move(action)
     local key = self.actions[action]
     if self.move_event[key] then
         if self.func[action] then self.func[action]() end
@@ -87,7 +93,7 @@ function Ctrl:move(action)
     end
 end
 
-function Ctrl:press(action)
+function CTRL:press(action)
     local key = self.actions[action]
     if self.press_event[key] then
         self.press_event[key] = nil
@@ -96,7 +102,7 @@ function Ctrl:press(action)
     end
 end
 
-function Ctrl:release(action)
+function CTRL:release(action)
     local key = self.actions[action]
     if self.release_event[key] then
         self.release_event[key] = nil
@@ -105,7 +111,11 @@ function Ctrl:release(action)
     end
 end
 
-function Ctrl:down(action, interval, delay)
+function CTRL:position()
+    return self.mpos.x,self.mpos.y,self.mpos.dx,self.mpos.dy
+end
+
+function CTRL:down(action, interval, delay)
     local key = self.actions[action]
 
     if not self.press_event[key] and self.repeat_action[key] then
@@ -151,7 +161,7 @@ function Ctrl:down(action, interval, delay)
     end
 end
 
-function Ctrl:keypressed(key,unicode)
+function CTRL:keypressed(key,unicode)
     self.press_event[key] = true
     -- combo
     if self.init_combo and self.combos[self.init_combo..'+'..key] then
@@ -160,13 +170,13 @@ function Ctrl:keypressed(key,unicode)
     if not self.init_combo then self.init_combo = key end
 end
 
-function Ctrl:keyreleased(key,unicode)
+function CTRL:keyreleased(key,unicode)
     self.press_event[key] = nil
     self.release_event[key] = true
     if self.init_combo==key then self.init_combo = false end
 end
 
-function Ctrl:mousepressed(x,y,button,istouch)
+function CTRL:mousepressed(x,y,button,istouch)
     self.press_event[self.mouse_but[button]]=true
     -- double click
     if self.timer_double then
@@ -180,18 +190,18 @@ function Ctrl:mousepressed(x,y,button,istouch)
     self.init_double = button
 end
 
-function Ctrl:mousereleased(x,y,button,istouch)
+function CTRL:mousereleased(x,y,button,istouch)
     self.press_event[self.mouse_but[button]] = nil
     self.release_event[self.mouse_but[button]] = true
 end
 
-function Ctrl:mousemoved(x,y,dx,dy,istouch)
+function CTRL:mousemoved(x,y,dx,dy,istouch)
     self.mmove = true
     self.move_event['mmove'] = true
     self.mpos = {x=x,y=y,dx=dx,dy=dy}
 end
 
-function Ctrl:wheelmoved(x,y)
+function CTRL:wheelmoved(x,y)
     self.wmove=true
     if x>0 then self.move_event['wright']=true end
     if x<0 then self.move_event['wleft']=true end
@@ -199,7 +209,7 @@ function Ctrl:wheelmoved(x,y)
     if y<0 then self.move_event['wdown']=true end
 end
 
-function Ctrl:update(dt)
+function CTRL:update(dt)
     self.mmove, self.wmove = false, false
     self.move_event['mmove'] = false
     self.move_event['wup'] = false
@@ -216,4 +226,4 @@ function Ctrl:update(dt)
     end
 end
 
-return Ctrl
+return CTRL

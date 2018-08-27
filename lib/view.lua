@@ -9,9 +9,10 @@ local set = require('lib/set')
 local View = {}
 
 function View:new()
+    ui.init()
     self.ui = ui
     self.scr = nil
-    self.sel_ship = {val='wasp'}
+    self.avatar = {val='wasp'}
     self.bg = love.graphics.newImage(set.OBJ['bg'])
     self.bg_ui = love.graphics.newImage(set.OBJ['bg_ui'])
     self.menu_ui = love.graphics.newImage(set.OBJ['menu_ui'])
@@ -22,29 +23,33 @@ function View:new()
     self.tmr:every(self.blink_time, function() self.blink=not self.blink end)
 end
 
+function View:get_scr() return self.scr end
+function View:get_ui() return self.ui end
+function View:get_avatar() return self.avatar.val end
+
 function View:set_start_scr()
     self.scr='ui_scr'
     ui.Manager.clear()
     -- menu
-    ui.Selector{x=310, y=set.HEI-93, text='wasp', variable=self.sel_ship,
+    ui.Selector{x=310, y=set.HEI-93, text='wasp', variable=self.avatar,
                     image=set.OBJ['waspb'],
                     command=function() set.AUD['click']:play() end}
-    ui.Selector{x=490, y=set.HEI-93, text='wing', variable=self.sel_ship,
+    ui.Selector{x=490, y=set.HEI-93, text='wing', variable=self.avatar,
                     image=set.OBJ['wingb'],
                     command=function() set.AUD['click']:play() end}
 
-    ui.Button{x=400, y=set.HEI-93, image=set.OBJ['start'],
+    ui.Button{x=400, y=set.HEI-93, image=set.OBJ['start'],frame=0,
              command=function() set.AUD['click']:play()
                                 Model:startgame() end}
     -- select level
     ui.Label{x=604, y=set.HEI-90, fnt=set.GAMEFNT,fntclr=set.DISPGREEN,
                 variable=Model.level, scewy=0.2}
-    ui.Button{x=584, y=set.HEI-92, image=set.OBJ['levleft'],
+    ui.Button{x=584, y=set.HEI-92, image=set.OBJ['levleft'],frame=0,
         command=function() set.AUD['click']:play()
                 if Model.level.val>1 then
                     Model.level.val=Model.level.val-1 end
                 end}
-    ui.Button{x=624, y=set.HEI-84,image=set.OBJ['levright'],
+    ui.Button{x=624, y=set.HEI-84,image=set.OBJ['levright'],frame=0,
         command=function() set.AUD['click']:play()
                 if Model.level.val<Model.maxlevel then
                     Model.level.val=Model.level.val+1 end
@@ -55,10 +60,10 @@ function View:set_start_scr()
     ui.Label{x=175, y=set.HEI-164, text=Model.maxscore,
                 fnt=set.MENUFNT, fntclr=set.DISPGREEN, scewy=-0.05}
     -- aud
-    ui.CheckBox{x=79,y=set.HEI-82, mode='line',
+    ui.CheckBox{x=79,y=set.HEI-82,frame=0,
                 image=set.OBJ['sfx'], variable=Model.sfx,
                 command=function() set.AUD['click']:play() end}
-    ui.CheckBox{x=146,y=set.HEI-91, mode='line',
+    ui.CheckBox{x=146,y=set.HEI-91,frame=0,
                 image=set.OBJ['music'], variable=Model.audio,
                 command=function() set.AUD['click']:play() end}
 end
@@ -84,16 +89,17 @@ function View:draw()
     end
 
     if self.scr=='game_scr' then
-        love.graphics.setColor({Model.fade,Model.fade,
-                               Model.fade,Model.fade})
+            local fade = Model:get_fade()
+        love.graphics.setColor({fade,fade,fade,fade})
+
         love.graphics.draw(self.bg)
 
-        for item in pairs(Model.objects) do
+        for item in pairs(Model:get_objects()) do
             if item.draw then item:draw() end
         end
     end
     -- particle menu & game
-    for particle in pairs(Model.particle) do
+    for particle in pairs(Model:get_particle()) do
         love.graphics.draw(particle)
     end
 
@@ -129,7 +135,7 @@ function View:draw()
         love.graphics.draw(self.radar, 533, set.HEI-228)
     end
 
-    for _, item in pairs(ui.Manager.items) do item:draw() end
+    ui.Manager.draw()
 end
 
 return View

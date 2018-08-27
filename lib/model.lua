@@ -13,7 +13,7 @@ local Model = {}
 Model.tag = 'model'
 -- static cmp
 Model.get_hypot = cmp.get_hypot
-Model.get_randpos = cmp.get_randpos
+Model.get_randxy = cmp.get_randxy
 -- particle
 Model.local_particle=cmp.local_particle
 function Model:new()
@@ -31,7 +31,7 @@ function Model:new()
     self.radar_min = 1
     self.radar_max = 360
     self.border = imd.circle_px(self.radius)
-    self.all_dots = imd.circle_all_px(self.radius-20)
+    self.all_dots = imd.circle_allpx(self.radius-20)
 
     self.tmr = Tmr:new()
     -- sound bool
@@ -42,8 +42,6 @@ function Model:new()
 end
 
 function Model:reset()
-    Ctrl:bind('space','start',function() set.AUD['click']:play()
-                                             Model:startgame() end)
     self.particle ={}
     self.objects = {}
     self.avatar = nil
@@ -73,13 +71,22 @@ function Model:reset()
     -- menu music
     set.AUD['intro']:setLooping(true)
     set.AUD['intro']:play()
-
+    Ctrl:bind('space','start',function() self:startgame() end)
     View:set_start_scr()
 end
 
 function Model:spawn(item) self.objects[item] = item end
 function Model:destroy(item) self.objects[item] = nil end
-function Model:getobj() return self.objects end
+function Model:get_objects() return self.objects end
+function Model:get_particle() return self.particle end
+function Model:get_fade() return self.fade end
+
+function Model:set_pause(pause)
+    if View:get_scr()=='game_scr' then
+        self.pause = pause or not self.pause
+        View:set_label('PAUSE',self.pause)
+    end
+end
 
 function Model:startgame()
     -- update bind for space
@@ -87,16 +94,15 @@ function Model:startgame()
     Ctrl:bind('space','fire')
 
     set.AUD['intro']:stop()
-    self.avatar = self.ships[View.sel_ship.val]{model=self,
-                                                   x=set.MIDWID,
+    self.avatar = self.ships[View:get_avatar()]{x=set.MIDWID,
                                                    y=set.MIDHEI}
 
     self.fog = self:local_particle({1}, {set.WHITEFF,set.WHITEF,set.WHITEFF},
                                      set.OBJ['cloud'], {6,15}, {0.1,15},
                                      {-1,-1, 1, 1})
-    self.fog:setRotation(0.3, 1.5)
-    self.fog:setEmitterLifetime(-1)
-    self.fog:emit(1)
+    self.fog.particle:setRotation(0.3, 1.5)
+    self.fog.particle:setEmitterLifetime(-1)
+    self.fog.particle:emit(1)
 
     set.AUD['loop']:setVolume(self.volume)
     set.AUD['loop']:setLooping(true)
@@ -110,7 +116,7 @@ function Model:startgame()
 end
 
 function Model:update(dt)
-    if View.scr=='ui_scr' then
+    if View:get_scr()=='ui_scr' then
         -- on/off audio
         if self.audio.bool==false then
             set.AUD['loop']:setVolume(0)
@@ -146,36 +152,53 @@ function Model:update(dt)
         if particle:getCount()==0 then particle:reset() end
     end
 
-    local randx,randy = self.get_randpos(nil,nil,set.WID,set.HEI,'rand')
+    local randx,randy = self.get_randxy(nil,nil,set.WID,set.HEI,'rand')
 
-    self.dust:emit(1)
-    self.dust:setPosition(randx,randy)
+    self.dust.particle:emit(1)
+    self.dust.particle:setPosition(randx,randy)
 
-    self.grdust:emit(1)
-    self.grdust:setPosition(randx,randy)
+    self.grdust.particle:emit(1)
+    self.grdust.particle:setPosition(randx,randy)
 
     -- game
-    if View.scr=='game_scr' then
+    if View:get_scr()=='game_scr' then
         if self.pause then return end
-        set.AUD['loop']:setVolume(self.volume)
         -- clouds
-        self.fog:setEmissionRate(love.math.random(1,3))
-        self.fog:setPosition(randx,randy)
+        self.fog.particle:setEmissionRate(love.math.random(1,3))
+        self.fog.particle:setPosition(randx,randy)
 
         local num_aster = 0
+
+        -- collision
         for object in pairs(self.objects) do
             object.last_collision = {}
+            for collider in pairs(self.objects) do
+                object:collision(collider,dt)
+            end
+            if #object.last_collision == 0 then
+                object.collide=nil
+            end
+        end
+
+        -- update objects
+        for object in pairs(self.objects) do
             if object.update then object:update(dt) end
             if object.tag=='aster' then num_aster = num_aster+1 end
         end
+
         -- new level
         if num_aster==0 then self.level.val = self.level.val+1
             self.fade=0.5
             self.volume=0
-            self.tmr:tween(2, self, {fade=1,volume=set.LOOPV})
+            if self.audio.bool then
+                self.tmr:tween(2, self, {volume=set.LOOPV})
+                self.tmr:during(2,function()
+                                set.AUD['loop']:setVolume(self.volume) end)
+            end
+            self.tmr:tween(2, self, {fade=1})
             set.AUD['level']:play()
             for _=1,self.level.val-1 do
-                obj.Asteroid{model=self}
+                obj.Asteroid()
             end
         end
         -- fade
@@ -186,7 +209,7 @@ function Model:update(dt)
         end
     end
     -- ui update
-    for _, item in pairs(View.ui.Manager.items) do item:update(dt) end
+    View:get_ui().Manager.update(dt)
 end
 
 function Model:endgame()

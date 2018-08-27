@@ -1,6 +1,6 @@
 #!/usr/bin/env love
 -- LOVFL
--- 0.1
+-- 0.3
 -- Files Function (love2d)
 -- lovfl.lua
 
@@ -25,25 +25,27 @@
 -- FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 -- DEALINGS IN THE SOFTWARE.
 
--- 0.2
--- lfs system
 
+if arg[1] then print('0.3 LOVFL Files Function (love2d)', arg[1]) end
+
+-- old lua version
 local unpack = table.unpack or unpack
 local utf8 = require('utf8')
-local lfs = love.filesystem
+
+local lvfs = love.filesystem
 
 local FL={}
 
 function FL.load_all(dir,...)
     local extensions={...}
-    local files = lfs.getDirectoryItems(dir)
+    local files = lvfs.getDirectoryItems(dir)
     local arr = {}
     for i=1,#files do
         local path = dir .. '/' .. files[i]
         local ext = path:match('[^.]+$')
         local base = path:match('([^/]+)[%.]')
         for e=1,#extensions do
-            if (lfs.getInfo(path).type=='file' and ext==extensions[e]) then
+            if (lvfs.getInfo(path).type=='file' and ext==extensions[e]) then
                 arr[base] = path
             end
         end
@@ -53,15 +55,16 @@ end
 
 function FL.tree(dir,arr,verbose)
     dir = dir or ''
+    if #dir>0 and dir:sub(1,1)~='/' then dir = '/'..dir end
     arr = arr or {}
-    local files = lfs.getDirectoryItems(dir)
+    local files = lvfs.getDirectoryItems(dir)
     if verbose then print('dir', dir) end
     for i=1, #files do
         local path = dir..'/'..files[i]
-        if lfs.getInfo(path).type=='file' then
+        if lvfs.getInfo(path).type=='file' then
             arr[#arr+1] = path
             if verbose then print(#arr,path) end
-        elseif lfs.getInfo(path).type=='directory' then
+        elseif lvfs.getInfo(path).type=='directory' then
             FL.tree(path,arr,verbose)
         end
     end
@@ -81,30 +84,34 @@ function FL.save_file(path,datastr)
     file:close()
 end
 
+function FL.append_file(path,datastr)
+    local file = io.open(path,'a')
+    file:write(datastr)
+    file:close()
+end
+
 function FL.copy_file(path,dir)
     local newpath = dir..'/'..path:match('[^/]+$')
     local datastr = FL.load_file(path)
     FL.save_file(newpath,datastr)
 end
 
-function FL.copy_love(file,dir)
-    if not lfs.getInfo(dir) then
-        lfs.createDirectory(dir)
-    end
-    FL.copy_file(file:getFilename(),
-                 lfs.getSaveDirectory()..'/'..dir)
-    love.system.openURL('file://'..lfs.getSaveDirectory())
+function FL.load_love(path)
+    local chunk, err = lvfs.load(path)
+    if not err then return chunk() end
 end
 
 function FL.save_love(path,datastr)
-    local file = lfs.newFile(path,'w')
+    local file = lvfs.newFile(path,'w')
     file:write(datastr)
     file:close()
 end
 
-function FL.load_love(path)
-    local chunk, err = lfs.load(path)
-    if not err then return chunk() end
+function FL.copy_love(file,dir)
+    if not lvfs.getInfo(dir) then lvfs.createDirectory(dir) end
+
+    FL.copy_file(file:getFilename(), lvfs.getSaveDirectory()..'/'..dir)
+    love.system.openURL('file://'..lvfs.getSaveDirectory())
 end
 
 return FL
