@@ -26,8 +26,7 @@
 -- DEALINGS IN THE SOFTWARE.
 
 -- 3.0
--- tutorial controls
--- refactor radar
+-- help for controls
 -- bounce rocket
 -- bounce aster (born separetly)
 
@@ -75,7 +74,8 @@ end
 
 -- dt around 0.016618420952
 function love.update(dt)
-    local upd_title = string.format('%s %s', set.GAMENAME, set.VER)
+    local upd_title = string.format('%s %s %.2d', set.GAMENAME, set.VER,
+                                    love.timer.getFPS())
     love.window.setTitle(upd_title)
 
     -- update model

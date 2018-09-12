@@ -25,22 +25,20 @@
 -- FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 -- DEALINGS IN THE SOFTWARE.
 
+-- check sin cos for speed
+-- improve weight and inertion with weight
 -- 0.3
--- rotate img when change direction
 -- per pixel collision masksb
--- particle rotation
--- paritcle update
+-- add particle option rotation
 -- 0.4
--- box rotation
+-- rectangle rotation
 -- circle rotation hill
 -- fall bricks after center
 -- walk in hill
--- improve inertion with weight
 -- 0.5
 -- border problem collide when out screen
--- improve speed perfomance for colliders
 -- 1.0
--- upgrade to box2d physics
+-- upgrade to rectangle2d physics
 
 if arg[1] then print('0.2 LOVCMP Game Components (love2d)', arg[1]) end
 
@@ -48,8 +46,9 @@ if arg[1] then print('0.2 LOVCMP Game Components (love2d)', arg[1]) end
 local unpack = table.unpack or unpack
 local utf8 = require('utf8')
 
-local CMP={DT = 0.017,EPSILON = 2^-31,GRAVITY = {x=0, y=1},TILESIZE=1}
+local CMP = {DT = 0.017,EPSILON = 2^-31,GRAVITY = {x=0, y=1},TILESIZE=1}
 function CMP.set_obj(obj,data)
+    data = data or obj.img_data
     local wid,hei = data:getDimensions()
     obj.cenx = wid/2
     obj.ceny = hei/2
@@ -66,7 +65,7 @@ function CMP.set_obj(obj,data)
     if obj.weight<1 then obj.weight=1.5 end
     obj.body = obj.body or 'dynamic'
     if obj.bounce==nil then obj.bounce = false end
-    obj.collider = obj.collider or 'box'
+    obj.collider = obj.collider or 'rectangle'
     obj.last_collision = {}
     obj.particle = {}
 
@@ -79,7 +78,8 @@ end
 
 function CMP.set_sprites(obj,data,tilex,tiley,numx,numy)
     obj.sprites = {}
-    obj.sprites.tiles = love.graphics.newImage(data)
+    obj.sprites.default = love.graphics.newImage(data)
+    obj.sprites.tiles = obj.sprites.default
     obj.sprites.tiles:setFilter('nearest', 'linear')
     obj.sprites.quads = {}
     local sx = obj.sprites.tiles:getWidth()
@@ -97,40 +97,80 @@ end
 function CMP.sprite_animation(obj,start,fin,total)
     total=total or 1
     fin=fin+1
-    local animation={start=start,fin=fin,total=total,elapsed=0}
-    obj.image=obj.sprites.tiles
+    local animation={start=start,fin=fin,total=total,speed=1,elapsed=0}
     animation.upd=function(dt)
             animation.elapsed=animation.elapsed+dt
-            if animation.elapsed>=animation.total then
+            if animation.elapsed>=(animation.total/animation.speed) then
                 animation.elapsed=0
             end
-            local pass=animation.elapsed/animation.total
+            local pass=animation.elapsed/(animation.total/animation.speed)
             local index=start+math.floor(pass*(fin-start))
             obj.quad=obj.sprites.quads[index]
             end
+    animation.set_image=function(image)
+                            image = image or obj.sprites.default
+                            obj.sprites.tiles=image
+                            obj.image=obj.sprites.tiles
+                        end
+    animation.set_speed=function(speed) animation.speed=speed end
+    animation.set_image()
     return animation
+end
+
+function CMP.set_world(obj,meter,gravx,gravy)
+    meter = meter or 64
+    gravx = gravx or CMP.GRAVITY.x
+    gravy = gravy or CMP.GRAVITY.y
+
+    love.physics.setMeter(meter)
+    obj.world = love.physics.newWorld(gravx,gravy, true)
+    obj.world:setCallbacks(obj.begin_contact, obj.end_contact,
+                         obj.pre_solve, obj.post_solve)
+
+    obj.get_world = function(self) return self.world end
+end
+
+function CMP.set_body(obj,mass,density,collider,vertex)
+    density = density or 4
+    mass = mass or 128
+    collider = collider or obj.collider
+    vertex = vertex or {-40,20,0,0,-40,-20}
+    obj.body=love.physics.newBody(obj.model.world, obj.x,obj.y,obj.body)
+    if collider=='circle' then
+        obj.shape = love.physics.newCircleShape(obj.radius)
+    elseif collider=='rectangle' then
+        obj.shape = love.physics.newRectangleShape(obj.wid,obj.hei)
+    else
+        obj.shape=love.physics.newPolygonShape(vertex)
+    end
+    obj.body:setMass(mass)
+
+    obj.fixture = love.physics.newFixture(obj.body, obj.shape, density)
+    obj.fixture:setUserData(obj)
+
+    obj.get_body = function(self) return self.body end
+    obj.get_shape = function(self) return self.shape end
+    obj.get_fixture = function(self) return self.body end
 end
 
 function CMP.rect_upd(obj)
     obj.rect = CMP.get_rect(obj)
 end
 
-function CMP.move_upd(obj,dt)
+function CMP.dxdy_upd(obj,dt)
     dt = dt or CMP.DT
     obj.x = obj.x+obj.dx*dt
     obj.y = obj.y+obj.dy*dt
-    obj.rect = CMP.get_rect(obj)
 end
 
-function CMP.rotate_upd(obj,dt)
+function CMP.angle_upd(obj,dt)
     dt = dt or CMP.DT
-    obj.rot_ang = obj.rot_ang+obj.rot_dt*dt
-    obj.rect = CMP.get_rect(obj)
+    obj.angle = obj.angle+obj.da*dt
 end
 
 function CMP.move(obj,dist)
     dist = dist or obj.speed
-    local cosx,siny = CMP.get_cos_sin(obj.rot_ang)
+    local cosx,siny = CMP.get_cos_sin(obj.angle)
     local dx,dy = obj.dx+cosx*dist,obj.dy+siny*dist
 
     if obj.maxspeed then
@@ -144,10 +184,9 @@ end
 
 function CMP.rotate(obj,side)
     side = side or 0
-    obj.rot_dt = obj.rot_dt+side*obj.rotspeed
-    if obj.maxrotspeed then
-        obj.rot_dt = math.min(math.max(obj.rot_dt,
-                                       -obj.maxrotspeed), obj.maxrotspeed)
+    obj.da = obj.da+side*obj.torque
+    if obj.maxtorque then
+        obj.da = math.min(math.max(obj.da,-obj.maxtorque), obj.maxtorque)
     end
 end
 
@@ -182,17 +221,17 @@ function CMP.jump(obj,hei)
 end
 
 function CMP.stop(obj,rotate)
-    if rotate=='rotate' then obj.rot_dt = 0
+    if rotate=='rotate' then obj.da = 0
     else
         obj.dx,obj.dy = 0,0
     end
 end
 
-function CMP.velocity(obj,dx,dy)
-    dx = dx or 0
-    dy = dy or 0
-    obj.dx = obj.dx + dx
-    obj.dy = obj.dy + dy
+function CMP.velocity(obj,x,y)
+    x = x or 0
+    y = y or 0
+    obj.dx = obj.dx + x
+    obj.dy = obj.dy + y
 end
 
 function CMP.friction(obj,dt)
@@ -201,9 +240,9 @@ function CMP.friction(obj,dt)
     obj.dy = obj.dy-obj.dy*dt
 end
 
-function CMP.rotate_friction(obj,dt)
+function CMP.angle_friction(obj,dt)
     dt = dt or CMP.DT
-    obj.rot_dt = obj.rot_dt-obj.rot_dt*dt
+    obj.da = obj.da-obj.da*dt
 end
 
 function CMP.circle_view(obj,x,y)
@@ -221,8 +260,8 @@ function CMP.sector_view(obj,x,y)
     local cenx,ceny = obj.x, obj.y
     local maxview = obj.viewrange or obj.radius*2
     local angle = obj.viewangle or math.rad(45)
-    local cosx_up,siny_up = CMP.get_cos_sin(obj.rot_ang-angle)
-    local cosx_down,siny_down = CMP.get_cos_sin(obj.rot_ang+angle)
+    local cosx_up,siny_up = CMP.get_cos_sin(obj.angle-angle)
+    local cosx_down,siny_down = CMP.get_cos_sin(obj.angle+angle)
 
     local x1,y1,x2,y2
     x1 = cenx+maxview*cosx_up
@@ -258,13 +297,47 @@ function CMP.out_scr(obj,widscr,heiscr)
 end
 
 
+function CMP.target(obj,x,y,rotate)
+    local tcosx,tsiny = CMP.get_direction(obj.x,obj.y,x,y)
+    local dx,dy = tcosx*obj.speed,tsiny*obj.speed
+    local side = 0
+    if rotate then
+        local ocosx,osiny = CMP.get_direction(obj.x,obj.y,
+                                            obj.rect.right[1],
+                                             obj.rect.right[2])
+        local tarcos = tcosx-tcosx%0.1
+        local objcos = ocosx-ocosx%0.1
+        local tarsin = tsiny-tsiny%0.1
+        local objsin = osiny-osiny%0.1
+
+        if tarcos == objcos and tarsin == objsin then
+            obj.da=0
+            return dx,dy,side
+        end
+
+        local tacos = math.acos(tcosx)
+        local oacos = math.acos(ocosx)
+
+        if tarsin<0 then tacos = math.pi*2-tacos end
+        if objsin<0 then oacos = math.pi*2-oacos end
+
+        if tacos>=oacos then
+            side=1
+            if tacos-oacos > math.pi then side=-1 end
+        else side=-1
+            if oacos-tacos > math.pi then side=1 end
+        end
+    end
+    return dx,dy,side
+end
+
 function CMP.shot(obj,side,weapon_offset,inertion)
     weapon_offset = weapon_offset or {0,0}
     inertion = inertion or 0
     local x,y = CMP.get_side(obj.rect[side][1],
-                             obj.rect[side][2], obj.rot_ang, weapon_offset)
-    obj.weapon{x=x,y=y,rot_ang=obj.rot_ang,
-                        dx=obj.dx, dy=obj.dy, rot_dt=0, scale=obj.scale}
+                             obj.rect[side][2], obj.angle, weapon_offset)
+    obj.weapon{x=x,y=y ,angle=obj.angle,
+                dx=obj.dx, dy=obj.dy, da=0, scale=obj.scale}
     if obj.move then obj:move(inertion) end
 end
 
@@ -296,12 +369,11 @@ function CMP.get_particle(shsize,shtype)
     return canvas
 end
 
-
-function CMP.global_particle(obj,x,y,num,shsize,clrs,shtype,time,ptsize,accel)
+function CMP.global_particle(obj,x,y,en,shsize,clrs,shtype,time,ptsize,accel)
     obj.model.particle = obj.model.particle or {}
     x = x or obj.x
     y = y or obj.y
-    num = num or 20
+    en = en or 20
     shsize = shsize or {1}
     clrs = clrs or {{1,1,0,1}, {1,164/255,64/255,1}, {64/255,64/255,64/255,0}}
     local grad = {}
@@ -312,16 +384,16 @@ function CMP.global_particle(obj,x,y,num,shsize,clrs,shtype,time,ptsize,accel)
     time = time or {0.3,1}
     ptsize = ptsize or {0.5,1}
     accel = accel or 100
-    accel = {-love.math.random(accel/2,accel),
+    local finaccel = {-love.math.random(accel/2,accel),
             -love.math.random(accel/2,accel),
             love.math.random(accel/2,accel),
             love.math.random(accel/2,accel)}
 
     for i=1, #shsize do
         local image = CMP.get_particle(shsize[i],shtype)
-        local particle = love.graphics.newParticleSystem(image, 300)
+        local particle = love.graphics.newParticleSystem(image, 600)
         particle:setParticleLifetime(unpack(time))
-        particle:setLinearAcceleration(unpack(accel))
+        particle:setLinearAcceleration(unpack(finaccel))
         particle:setColors(unpack(grad))
         particle:setSizes(unpack(ptsize))
         particle:setPosition(x, y)
@@ -329,7 +401,7 @@ function CMP.global_particle(obj,x,y,num,shsize,clrs,shtype,time,ptsize,accel)
         particle:setEmissionArea('uniform', 5, 5, 0)
         particle:setRotation(1, 8)
         particle:setSpin(1, 4)
-        particle:emit(num)
+        particle:emit(en)
         obj.model.particle[particle] = particle
     end
 end
@@ -345,10 +417,14 @@ function CMP.local_particle(obj,shsize,clrs,shtype,time,ptsize,accel)
     shtype = shtype or 'circle'
     time = time or {0.5,1}
     ptsize = ptsize or {0.2,1}
-    accel = accel or {-40,-40,40,40}
+    accel = accel or 40
+    accel = {-love.math.random(accel/2,accel),
+            -love.math.random(accel/2,accel),
+            love.math.random(accel/2,accel),
+            love.math.random(accel/2,accel)}
 
     local image = CMP.get_particle(shsize,shtype)
-    local particle = love.graphics.newParticleSystem(image, 300)
+    local particle = love.graphics.newParticleSystem(image, 400)
     particle:setParticleLifetime(unpack(time))
     particle:setLinearAcceleration(unpack(accel))
     particle:setColors(unpack(grad))
@@ -359,15 +435,17 @@ function CMP.local_particle(obj,shsize,clrs,shtype,time,ptsize,accel)
     obj.particle[particle] = particle
 
     local local_particle={['particle']=particle}
-    function local_particle.upd(dt,side,offset,speed)
+    function local_particle.upd(dt,side,offset,speed,angle)
+        dt = dt or CMP.DT
         side = side or 'center'
         offset = offset or {0,0}
         speed = speed or 0
+        angle = angle or obj.angle
         local x,y = CMP.get_side(obj.rect[side][1], obj.rect[side][2],
-                                 obj.rot_ang,offset)
+                                 obj.angle,offset)
         local_particle.particle:setPosition(x, y)
-        local_particle.particle:setSpeed(speed)
-        local_particle.particle:setDirection(obj.rot_ang)
+        local_particle.particle:setSpeed(speed/2,speed)
+        local_particle.particle:setDirection(angle)
         local_particle.particle:update(dt)
     end
     return local_particle
@@ -403,10 +481,13 @@ function CMP.destroy_particle(obj,maxnum,time,accel)
 end
 
 function CMP.get_rect(obj)
-    local cosx,siny = CMP.get_cos_sin(obj.rot_ang)
+    local cosx,siny = CMP.get_cos_sin(obj.angle)
     local wid,hei = obj.img_data:getDimensions()
-    local midwid=(wid*obj.scale)/2
-    local midhei=(hei*obj.scale)/2
+    obj.wid = wid*obj.scale
+    obj.hei = hei*obj.scale
+    obj.radius = math.min(obj.wid, obj.hei)/2
+    local midwid=obj.wid/2
+    local midhei=obj.hei/2
     local horx = cosx*midwid
     local hory = siny*midwid
     local verx = cosx*midhei
@@ -603,11 +684,11 @@ end
 function CMP.collision(obj1,obj2,dt)
     dt = dt or CMP.DT
     if obj1~=obj2 and obj1.body=='dynamic' then
-        if obj1.collider=='box' then
-            CMP.box_collision(obj1,obj2,dt)
+        if obj1.collider=='rectangle' then
+            return CMP.rectangle_collision(obj1,obj2,dt)
         end
         if obj1.collider=='circle' then
-            CMP.circle_collision(obj1,obj2,dt)
+            return CMP.circle_collision(obj1,obj2,dt)
         end
 
         local dots = {}
@@ -616,17 +697,17 @@ function CMP.collision(obj1,obj2,dt)
                 dots[#dots+1] = obj1.rect[obj1.collider[i]]
             end
         end
-        if dots then CMP.dots_collision(obj1,obj2,dots,dt) end
+        if dots then return CMP.dots_collision(obj1,obj2,dots,dt) end
     end
 end
 
-function CMP.base_box_collision(obj1,obj2,dots,dt)
+function CMP.base_rectangle_collision(obj1,obj2,dots,dt)
     local sides = {{obj2.rect.topleft, obj2.rect.topright},
                     {obj2.rect.topright, obj2.rect.botright},
                     {obj2.rect.botright, obj2.rect.botleft},
                     {obj2.rect.botleft, obj2.rect.topleft}}
 
-    local sq_box=obj2.wid*obj2.hei
+    local sq_rectangle=obj2.wid*obj2.hei
     for _,d in pairs(dots) do
         local newx = d[1]+obj1.dx*dt
         local newy = d[2]+obj1.dy*dt
@@ -637,7 +718,7 @@ function CMP.base_box_collision(obj1,obj2,dots,dt)
             sq_tri = sq_tri+CMP.get_vec2mulvec(s[1],s[2],{newx,newy})/2
         end
 
-        if sq_tri<=sq_box+1 then
+        if sq_tri<=sq_rectangle+1 then
             local offset,dst,side
             for i=1,#sides do
                 local s = sides[i]
@@ -702,19 +783,19 @@ function CMP.base_circle_collision(obj1,obj2,dots,dt)
     end
 end
 
-function CMP.box_collision(obj1,obj2,dt)
+function CMP.rectangle_collision(obj1,obj2,dt)
     local dots = obj1.rect
     if obj2.collider=='circle' then
         CMP.base_circle_collision(obj1,obj2,dots,dt)
-    elseif obj2.collider=='box' then
-       CMP.base_box_collision(obj1,obj2,dots,dt)
+    elseif obj2.collider=='rectangle' then
+       CMP.base_rectangle_collision(obj1,obj2,dots,dt)
     end
 end
 
 function CMP.circle_collision(obj1,obj2,dt)
     local cosx,siny = CMP.get_direction(obj1.x,obj1.y,obj2.x,obj2.y)
     local dots = {{obj1.x+cosx*obj1.radius, obj1.y+siny*obj1.radius}}
-    if obj2.collider=='box' then
+    if obj2.collider=='rectangle' then
         local sides = {{obj2.rect.topleft, obj2.rect.topright},
                     {obj2.rect.topright, obj2.rect.botright},
                     {obj2.rect.botright, obj2.rect.botleft},
@@ -727,7 +808,7 @@ function CMP.circle_collision(obj1,obj2,dt)
             dots[#dots+1] = {obj1.x+cosx*obj1.radius,
                                  obj1.y+siny*obj1.radius}
         end
-        CMP.base_box_collision(obj1,obj2,dots,dt)
+        CMP.base_rectangle_collision(obj1,obj2,dots,dt)
 
     elseif obj2.collider=='circle' then
         CMP.base_circle_collision(obj1,obj2,dots,dt)
@@ -735,8 +816,8 @@ function CMP.circle_collision(obj1,obj2,dt)
 end
 
 function CMP.dots_collision(obj1,obj2,dots,dt)
-    if obj2.collider=='box'  then
-        CMP.base_box_collision(obj1,obj2,dots,dt)
+    if obj2.collider=='rectangle'  then
+        CMP.base_rectangle_collision(obj1,obj2,dots,dt)
     else
         CMP.base_circle_collision(obj1,obj2,dots,dt)
     end
@@ -744,12 +825,7 @@ end
 
 function CMP.get_correction(inter,offset,dist,dot,s,side)
     local hypot = CMP.get_hypot(dot[1],dot[2],inter[1],inter[2])
-    if not dist then
-        dist = hypot
-        offset = inter
-        side = s
-    end
-    if hypot<dist then
+    if not dist or hypot < dist then
         dist = hypot
         offset = inter
         side = s
@@ -930,4 +1006,3 @@ function CMP.get_root(a,b,c)
 end
 
 return CMP
-

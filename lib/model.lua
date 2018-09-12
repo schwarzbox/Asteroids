@@ -62,12 +62,10 @@ function Model:reset()
     self.fin = false
     -- menu&game particles
     self.dust=self:local_particle(7, {set.WHITEFF,set.ORANGE,set.DARKGRAYF},
-                                     'circle', {5,30}, {0.1,0.6},
-                                     {-15,-15,15,15})
+                                     'circle', {5,30}, {0.1,0.6},15)
 
     self.grdust=self:local_particle(11, {set.WHITEFF,set.LIGHTGRAY,set.GRAYF},
-                                     'circle', {5,40}, {0.1,0.4},
-                                     {-10,-10,10,10})
+                                     'circle', {5,40}, {0.1,0.4},10)
     -- menu music
     set.AUD['intro']:setLooping(true)
     set.AUD['intro']:play()
@@ -98,8 +96,7 @@ function Model:startgame()
                                                    y=set.MIDHEI}
 
     self.fog = self:local_particle({1}, {set.WHITEFF,set.WHITEF,set.WHITEFF},
-                                     set.OBJ['cloud'], {6,15}, {0.1,15},
-                                     {-1,-1, 1, 1})
+                                     set.OBJ['cloud'], {6,15}, {0.1,15},1)
     self.fog.particle:setRotation(0.3, 1.5)
     self.fog.particle:setEmitterLifetime(-1)
     self.fog.particle:emit(1)

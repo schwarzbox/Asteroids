@@ -51,7 +51,7 @@ local UI = {kpress={},krelease={},mpress={},mrelease={},
 UI.DT = 0.017
 function UI.init()
     local ev = {'keypressed','keyreleased','mousepressed',
-            'mousereleased','mousemoved','wheelmoved'}
+            'mousereleased','mousemoved','wheelmoved','update'}
     -- add to love events
     local init_love = {}
     for i=1,#ev do
@@ -84,6 +84,8 @@ function UI.Cls(Super, cls)
     return setmetatable(cls,meta)
 end
 -- private
+function UI.update(dt) UI.clearevent() end
+
 function UI.keypressed(key,unicode,isrepeat)
     UI.kpress = {key,unicode,isrepeat}
 end
@@ -122,7 +124,6 @@ function UI.Manager.draw()
 end
 function UI.Manager.update(dt)
     for _, item in pairs( UI.Manager.items) do item:update(dt) end
-    UI.clearevent()
 end
 
 function UI.Manager.len() return #UI.Manager.items end
@@ -508,12 +509,12 @@ end
 
 UI.Label = UI.Cls(Proto,{text='', fnt=FNT, fntclr=FNTCLR, isrepeat=nil,
                 variable=nil, command=function() end, image=nil,
-                rotate=0, rot_dt=nil, scalex=1, scaley=1, scewx=0,scewy=0})
+                angle=0, da=nil, scalex=1, scaley=1, scewx=0,scewy=0})
 UI.Label.type = 'label'
 function UI.Label:new(o)
     self.pivot='center'
     self:set_image(self.image)
-    self.rotate=math.rad(self.rotate)
+    self.angle=math.rad(self.angle)
 
     self.defclr = self.fntclr
     self.onclr = {self.fntclr[1]+0.4,self.fntclr[2]+0.4,self.fntclr[3]+0.4,1}
@@ -577,13 +578,13 @@ function UI.Label.get_size(item,other)
     return wid,hei
 end
 
-function UI.Label:set_rotate(dt)
-    if self.rot_dt then self.rotate = self.rotate+self.rot_dt*dt end
+function UI.Label:set_angle(dt)
+    if self.da then self.angle = self.angle+self.da*dt end
 end
 
 function UI.Label:update(dt)
     dt=dt or UI.get_dt()
-    self:set_rotate(dt)
+    self:set_angle(dt)
     self:setup()
     if self.focus and not self.hide then
         if self.variable then self.text = self.variable.val end
@@ -597,12 +598,12 @@ function UI.Label:draw()
         self:draw_frame()
         love.graphics.setColor(self.defclr)
         if self.image then
-            love.graphics.draw(self.image, self.cenx, self.ceny, self.rotate,
+            love.graphics.draw(self.image, self.cenx, self.ceny, self.angle,
                                self.scalex, self.scaley, self.pivx, self.pivy,
                                self.scewx, self.scewy)
         else
             love.graphics.setFont(self.font)
-            love.graphics.print(self.text, self.cenx, self.ceny,self.rotate,
+            love.graphics.print(self.text, self.cenx, self.ceny,self.angle,
                                 self.scalex, self.scaley,
                                 self.pivx, self.pivy,
                                 self.scewx, self.scewy)
@@ -633,7 +634,7 @@ function UI.Input:new(o)
     UI.Input.Super.new(self)
     self.cursor=UI.Label{text='',fnt={self.fnt[1],self.fnt[2]-1},
                         frmclr=self.onclr, frame=self.cursize,
-                        mode='fill', image=image,rot_dt=self.rot_dt,hide=true}
+                        mode='fill', image=image,da=self.da,hide=true}
     -- input setup
     self:clear(true)
 end
@@ -768,7 +769,7 @@ function UI.Input:draw()
         love.graphics.setColor(self.defclr)
         love.graphics.print(self.text,
                             self.cenx+self.offsetwid-self.offset, self.ceny,
-                            self.rotate,self.scalex, self.scaley,
+                            self.angle,self.scalex, self.scaley,
                             self.pivx, self.pivy,self.scewx, self.scewy)
         love.graphics.setColor(WHITE)
     end
@@ -839,7 +840,7 @@ end
 
 function UI.CheckBox:update(dt)
     dt=dt or UI.get_dt()
-    self:set_rotate(dt)
+    self:set_angle(dt)
     self:setup()
 
     if self.focus and not self.hide then
@@ -859,7 +860,7 @@ UI.LabelExe = UI.Cls(UI.Label,{time=60})
 UI.LabelExe.type = 'labelexe'
 function UI.LabelExe:update(dt)
     dt=dt or UI.get_dt()
-    self:set_rotate(dt)
+    self:set_angle(dt)
     self:setup()
 
     if self.time<=0 then self:command() self:remove() return end
@@ -876,7 +877,7 @@ end
 
 function UI.Button:update(dt)
     dt=dt or UI.get_dt()
-    self:set_rotate(dt)
+    self:set_angle(dt)
     self:setup()
 
     if self.focus and not self.hide then
@@ -917,7 +918,7 @@ end
 
 function UI.Selector:update(dt)
     dt=dt or UI.get_dt()
-    self:set_rotate(dt)
+    self:set_angle(dt)
     self:setup()
     if self.focus and not self.hide then
         local press = self:mouse_colpress(1)
@@ -1101,7 +1102,7 @@ function UI.ProgBar:new(o)
         for _=1, self.max do
             self.border:add(UI.Label{text='', fnt=self.fnt,
                                 fntclr=self.onfrm, variable=nil,
-                                image=self.image, rot_dt=self.rot_dt,
+                                image=self.image, da=self.da,
                                 frame=0,frmclr=self.onfrm})
         end
     else
@@ -1148,11 +1149,11 @@ end
 
 function UI.ProgBar:update(dt)
     dt=dt or UI.get_dt()
-    self:set_value()
-    self:set_size()
     self:setup()
     if self.focus and not self.hide then
         local press = self:mouse_colpress(1)
+        self:set_value()
+        self:set_size()
         return press
     end
 end

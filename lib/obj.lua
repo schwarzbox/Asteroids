@@ -8,18 +8,19 @@ local cls = require('lib/cls')
 local set = require('lib/set')
 
 local O={}
-O.Base = cls.Cls({x=nil,y=nil, rot_ang=0, dx=0, dy=0,rot_dt=0,
+O.Base = cls.Cls({x=nil,y=nil, dx=0, dy=0, angle=0, da=0,
                  scale=set.SCALE, body='dynamic',collider='circle',
                  particle={}})
 -- cmp
 O.Base.set_obj = cmp.set_obj
+O.Base.rect_upd = cmp.rect_upd
 O.Base.borders = cmp.endless_scr
-O.Base.move_upd = cmp.move_upd
+O.Base.dxdy_upd = cmp.dxdy_upd
 O.Base.move = cmp.move
 O.Base.rotate = cmp.rotate
-O.Base.rotate_upd = cmp.rotate_upd
+O.Base.angle_upd = cmp.angle_upd
 O.Base.friction = cmp.friction
-O.Base.rotate_friction = cmp.rotate_friction
+O.Base.angle_friction = cmp.angle_friction
 O.Base.collision = cmp.collision
 O.Base.hit = cmp.hit
 -- particle
@@ -29,14 +30,15 @@ O.Base.local_particle = cmp.local_particle
 function O.Base:__tostring() return self.tag end
 
 function O.Base:draw()
-    love.graphics.draw(self.image,self.quad, self.x, self.y, self.rot_ang,
+    love.graphics.draw(self.image,self.quad, self.x, self.y, self.angle,
                        self.scale, self.scale, self.cenx, self.ceny)
     for particle in pairs(self.particle) do love.graphics.draw(particle) end
 end
 
 function O.Base:update(dt)
-    self:rotate_upd(dt)
-    self:move_upd(dt)
+    self:angle_upd(dt)
+    self:dxdy_upd(dt)
+    self:rect_upd()
     self:borders(set.WID,set.HEI)
 
     for i=1, #self.last_collision do
@@ -45,6 +47,18 @@ function O.Base:update(dt)
         if obj.tag=='aster' and self.tag~='aster' then
             if obj:hit(self.damage,self) then obj:destroy() end
             if self:hit(obj.damage,obj) then self:destroy() return end
+        end
+    end
+end
+
+function O.Base:stop_rotate(dt)
+    if self.auto_stop then
+        if self.da>self.torque then
+            self:rotate(-0.5)
+        elseif self.da<-self.torque then
+            self:rotate(0.5)
+        else
+            self:angle_friction(dt)
         end
     end
 end
@@ -74,8 +88,8 @@ O.Wasp = cls.Cls(O.Base,{tag='wasp'})
 O.Wasp.img_data = set.OBJ[O.Wasp.tag]
 O.Wasp.speed = 3
 O.Wasp.maxspeed = 160
-O.Wasp.rotspeed = math.rad(2)
-O.Wasp.maxrotspeed = math.rad(100)
+O.Wasp.torque = math.rad(2)
+O.Wasp.maxtorque = math.rad(100)
 O.Wasp.hp = 4
 -- cmp
 O.Wasp.shot = cmp.shot
@@ -129,18 +143,6 @@ function O.Wasp:hit(damage)
     return self.Super.hit(self,damage)
 end
 
-function O.Wasp:stop_rotate(dt)
-    if self.auto_stop then
-        if self.rot_dt>self.rotspeed then
-            self:rotate(-0.5)
-        elseif self.rot_dt<-self.rotspeed then
-            self:rotate(0.5)
-        else
-            self:rotate_friction(dt)
-        end
-    end
-end
-
 function O.Wasp:update(dt)
     self.Super.update(self,dt)
     self.engine1.upd(dt,'left' ,{-3,6}, -self.maxspeed/2)
@@ -172,8 +174,8 @@ O.Wing = cls.Cls(O.Base,{tag = 'wing'})
 O.Wing.img_data = set.OBJ[O.Wing.tag]
 O.Wing.speed = 2.5
 O.Wing.maxspeed = 100
-O.Wing.rotspeed = math.rad(1.3)
-O.Wing.maxrotspeed = math.rad(100)
+O.Wing.torque = math.rad(1.3)
+O.Wing.maxtorque = math.rad(100)
 O.Wing.hp = 5
 -- cmp
 O.Wing.shot=cmp.shot
@@ -221,18 +223,6 @@ function O.Wing:rotate(side)
     if side>0 then self.engine3.particle:emit(1)
     else self.engine4.particle:emit(1) end
     set.AUD['side_engine']:play()
-end
-
-function O.Wing:stop_rotate(dt)
-    if self.auto_stop then
-        if self.rot_dt>self.rotspeed then
-            self:rotate(-0.5)
-        elseif self.rot_dt<-self.rotspeed then
-            self:rotate(0.5)
-        else
-            self:rotate_friction(dt)
-        end
-    end
 end
 
 function O.Wing:hit(damage)
@@ -321,7 +311,7 @@ function O.Bullet:destroy()
 end
 
 
-O.Rocket = cls.Cls(O.Base,{tag='rocket',collider='box'})
+O.Rocket = cls.Cls(O.Base,{tag='rocket',collider='rectangle'})
 -- const
 O.Rocket.img_data = set.OBJ[O.Rocket.tag]
 O.Rocket.speed = 5
@@ -386,7 +376,7 @@ O.Asteroid = cls.Cls(O.Base, {tag='aster', size=3})
 -- const
 O.Asteroid.aster_data = imd.slice_imd(set.OBJ['aster'], 250, 250, 3)
 O.Asteroid.maxspeed = 90
-O.Asteroid.rotspeed = math.pi
+O.Asteroid.torque = math.pi
 -- static cmp
 O.Asteroid.get_randxy = cmp.get_randxy
 function O.Asteroid:new(o)
@@ -395,7 +385,7 @@ function O.Asteroid:new(o)
 
     self.dx = love.math.random(-self.maxspeed, self.maxspeed)
     self.dy = love.math.random(-self.maxspeed, self.maxspeed)
-    self.rot_dt = love.math.random(-self.rotspeed, self.rotspeed)
+    self.da = love.math.random(-self.torque, self.torque)
 
     self.scale = self.scale*self.size/4
     self.damage = self.size

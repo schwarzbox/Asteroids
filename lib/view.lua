@@ -89,7 +89,7 @@ function View:draw()
     end
 
     if self.scr=='game_scr' then
-            local fade = Model:get_fade()
+        local fade = Model:get_fade()
         love.graphics.setColor({fade,fade,fade,fade})
 
         love.graphics.draw(self.bg)
@@ -129,8 +129,7 @@ function View:draw()
         love.graphics.setLineWidth(1)
         -- center dot
         love.graphics.circle('fill',Model.radar.x1,Model.radar.y1,4)
-        love.graphics.setColor({Model.fade, Model.fade,
-                               Model.fade, Model.fade})
+        love.graphics.setColor(set.WHITE)
         -- radar cover
         love.graphics.draw(self.radar, 533, set.HEI-228)
     end
