@@ -9,14 +9,14 @@ local set = require('lib/set')
 local View = {}
 
 function View:new()
-    ui.init()
+    ui.load()
     self.ui = ui
     self.scr = nil
     self.avatar = {val='wasp'}
-    self.bg = love.graphics.newImage(set.OBJ['bg'])
-    self.bg_ui = love.graphics.newImage(set.OBJ['bg_ui'])
-    self.menu_ui = love.graphics.newImage(set.OBJ['menu_ui'])
-    self.radar = love.graphics.newImage(set.OBJ['radar'])
+    self.bg = love.graphics.newImage(set.IMG['bg'])
+    self.bg_ui = love.graphics.newImage(set.IMG['uibg'])
+    self.menu_ui = love.graphics.newImage(set.IMG['uifg'])
+    self.radar = love.graphics.newImage(set.IMG['radar'])
     self.blink = true
     self.blink_time = 0.5
     self.tmr = Tmr:new()
@@ -31,26 +31,26 @@ function View:set_start_scr()
     self.scr='ui_scr'
     ui.Manager.clear()
     -- menu
-    ui.Selector{x=310, y=set.HEI-93, text='wasp', variable=self.avatar,
-                    image=set.OBJ['waspb'],
-                    command=function() set.AUD['click']:play() end}
-    ui.Selector{x=490, y=set.HEI-93, text='wing', variable=self.avatar,
-                    image=set.OBJ['wingb'],
-                    command=function() set.AUD['click']:play() end}
+    ui.Selector{x=310, y=set.HEI-93, text='wasp', var=self.avatar,
+                    image=set.IMG['waspb'],
+                    com=function() set.AUD['click']:play() end}
+    ui.Selector{x=490, y=set.HEI-93, text='wing', var=self.avatar,
+                    image=set.IMG['wingb'],
+                    com=function() set.AUD['click']:play() end}
 
-    ui.Button{x=400, y=set.HEI-93, image=set.OBJ['start'],frame=0,
-             command=function() set.AUD['click']:play()
+    ui.Button{x=400, y=set.HEI-93, image=set.IMG['start'],frm=0,
+             com=function() set.AUD['click']:play()
                                 Model:startgame() end}
     -- select level
     ui.Label{x=604, y=set.HEI-90, fnt=set.GAMEFNT,fntclr=set.DISPGREEN,
-                variable=Model.level, scewy=0.2}
-    ui.Button{x=584, y=set.HEI-92, image=set.OBJ['levleft'],frame=0,
-        command=function() set.AUD['click']:play()
+                var=Model.level, scewy=0.2}
+    ui.Button{x=584, y=set.HEI-92, image=set.IMG['levleft'],frm=0,
+        com=function() set.AUD['click']:play()
                 if Model.level.val>1 then
                     Model.level.val=Model.level.val-1 end
                 end}
-    ui.Button{x=624, y=set.HEI-84,image=set.OBJ['levright'],frame=0,
-        command=function() set.AUD['click']:play()
+    ui.Button{x=624, y=set.HEI-84,image=set.IMG['levright'],frm=0,
+        com=function() set.AUD['click']:play()
                 if Model.level.val<Model.maxlevel then
                     Model.level.val=Model.level.val+1 end
                 end}
@@ -60,12 +60,12 @@ function View:set_start_scr()
     ui.Label{x=175, y=set.HEI-164, text=Model.maxscore,
                 fnt=set.MENUFNT, fntclr=set.DISPGREEN, scewy=-0.05}
     -- aud
-    ui.CheckBox{x=79,y=set.HEI-82,frame=0,
-                image=set.OBJ['sfx'], variable=Model.sfx,
-                command=function() set.AUD['click']:play() end}
-    ui.CheckBox{x=146,y=set.HEI-91,frame=0,
-                image=set.OBJ['music'], variable=Model.audio,
-                command=function() set.AUD['click']:play() end}
+    ui.CheckBox{x=79,y=set.HEI-82,frm=0,
+                image=set.IMG['sfx'], var=Model.sfx,
+                com=function() set.AUD['click']:play() end}
+    ui.CheckBox{x=146,y=set.HEI-91,frm=0,
+                image=set.IMG['music'], var=Model.audio,
+                com=function() set.AUD['click']:play() end}
 end
 
 function View:set_game_scr()
@@ -99,7 +99,7 @@ function View:draw()
         end
     end
     -- particle menu & game
-    for particle in pairs(Model:get_particle()) do
+    for particle in pairs(Model:get_particles()) do
         love.graphics.draw(particle)
     end
 

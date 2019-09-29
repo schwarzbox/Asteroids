@@ -1,6 +1,6 @@
 #!/usr/bin/env lua
 -- CLS
--- 1.0
+-- 1.5
 -- OOP (lua)
 -- cls.lua
 
@@ -31,26 +31,45 @@
 if arg[0] then print('1.0 CLS OOP (lua)', arg[0]) end
 if arg[1] then print('1.0 CLS OOP (lua)',arg[1]) end
 
--- old lua version
+-- lua<5.3
 local unpack = table.unpack or unpack
 local utf8 = require('utf8')
 
+-- init random
+math.randomseed(os.time())
+
 local CLS = {}
-function CLS.Cls(Super,class)
+local id
+
+function id()
+    local func = function(char)
+        local rand = math.random(11)-1
+        rand = (char == '0') and (rand+1) or (rand%2) + 5
+        return ('01248whoami'):sub(rand,rand)
+    end
+    return ('100000100001-1000-0000'):gsub('[01]',func)
+end
+
+function CLS.Class(Super,class)
     Super = Super or {}
     class = class or {}
     class.Super = Super
     class.total = 0
     local meta = {__index=Super}
 
-    meta.__call = function(self,o) o = o or {} self.__index = self
+    meta.__call = function(self,o)
+                    self.total = self.total + 1
+                    o = o or {}
+                    -- o.id = id()
+                    o.id = self
+                    self.__index = self
                     self = setmetatable(o, self)
                     if self.new then self.new(self, o) end
                     return self
                 end
     -- merge class
     meta.__add = function (self, oth)
-                    local New = CLS.Cls(self)
+                    local New = CLS.Class(self)
                     for k,v in pairs(oth) do New[k] = v  end
                     return New
                 end

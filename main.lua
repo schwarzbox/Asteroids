@@ -1,6 +1,6 @@
 #!/usr/bin/env love
 -- ASTEROIDS
--- 2.0
+-- 2.5
 -- Game (love2d)
 -- main.lua
 
@@ -25,6 +25,9 @@
 -- FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 -- DEALINGS IN THE SOFTWARE.
 
+-- Music by Eric Matyas
+-- www.soundimage.org
+
 -- 3.0
 -- help for controls
 -- bounce rocket
@@ -39,14 +42,12 @@ local set = require('lib/set')
 
 io.stdout:setvbuf('no')
 function love.load()
-    if arg[1] then print(set.VER, set.GAMENAME, 'Game (love2d)', arg[1]) end
-    -- set title in conf.lua
-    love.window.setTitle(string.format('%s %s', set.GAMENAME, set.VER))
+    if arg[1] then print(set.VER, set.APPNAME, 'Game (love2d)', arg[1]) end
     love.window.setFullscreen(set.FULLSCR, 'desktop')
     -- make icon
-    love.window.setIcon(imd.rotate_imd(set.OBJ['wasp'],'CCW'))
+    love.window.setIcon(imd.rotate(set.IMG['wasp'],'CCW'))
     -- set controller
-    Ctrl:new()
+    Ctrl.load()
     -- set model & view
     View:new()
     Model:new()
@@ -66,15 +67,14 @@ function love.load()
     Ctrl:bind('left','arr_left_stop')
     -- ctrl game
     Ctrl:bind('space','start',function() Model:startgame() end)
-    Ctrl:bind('lgui+r','restart',function() love.event.quit('restart') end)
-    Ctrl:bind('lgui+p','pause', function() Model:set_pause() end)
-    Ctrl:bind('escape','quit', function() love.quit() love.event.quit() end)
+    Ctrl:bind('escape','pause', function() Model:set_pause() end)
+    Ctrl:bind('lgui+r','cmdr',function() love.event.quit('restart') end)
     Ctrl:bind('lgui+q','cmdq', function() love.event.quit(1) end)
 end
 
 -- dt around 0.016618420952
 function love.update(dt)
-    local upd_title = string.format('%s %s %.2d', set.GAMENAME, set.VER,
+    local upd_title = string.format('%s %s fps %.2d', set.APPNAME, set.VER,
                                     love.timer.getFPS())
     love.window.setTitle(upd_title)
 
@@ -96,17 +96,17 @@ function love.update(dt)
             ava:rotate(1) ava.auto_stop = false end
         if Ctrl:down('left') or Ctrl:down('arr_left') then
             ava:rotate(-1) ava.auto_stop = false end
-        if Ctrl:down('fire', ava.weapon.cooldown) then
+        if Ctrl:down('fire', ava.weapon.type.cooldown) then
             -- change gun
-            ava.weapon_offset={ava.weapon_offset[1],-ava.weapon_offset[2]}
-            ava:shot(ava.weapon_side,ava.weapon_offset,ava.weapon.kick)
+            ava:setWeapon(nil,nil,{ava.weapon.offset[1],-ava.weapon.offset[2]})
+            ava:shot()
+
         end
     end
     -- ctrl game
     Ctrl:press('start')
     Ctrl:press('pause')
-    Ctrl:press('restart')
-    Ctrl:press('quit')
+    Ctrl:press('cmdr')
     Ctrl:press('cmdq')
 end
 
@@ -124,4 +124,3 @@ function love.mousepressed(x,y,button,istouch) end
 function love.mousereleased(x,y,button,istouch) end
 function love.mousemoved(x,y,dx,dy,istouch) end
 function love.wheelmoved(x, y) end
-function love.quit() print('game over') end

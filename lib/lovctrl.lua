@@ -27,38 +27,41 @@
 
 if arg[1] then print('3.0 LOVCTRL Controller (love2d)', arg[1]) end
 
--- old lua version
+-- lua<5.3
 local unpack = table.unpack or unpack
 local utf8 = require('utf8')
 
 local CTRL = {}
-function CTRL:new()
-    self.actions = {}
-    self.press_event = {}
-    self.release_event = {}
-    self.move_event = {}
-    self.repeat_action = {}
-    self.func = {}
-    self.init_double = false
-    self.timer_double = false
-    self.time_double = 0.4
-    self.combos = {}
-    self.init_combo = false
+function CTRL.load()
+    CTRL.actions = {}
+    CTRL.pressevent = {}
+    CTRL.releaseevent = {}
+    CTRL.moveevent = {}
+    CTRL.repeatevent = {}
+    CTRL.func = {}
+    CTRL.doubleclick = false
+    CTRL.doubletimer = false
+    CTRL.doubledelay = 0.4
+    CTRL.combos = {}
+    CTRL.combokey = false
 
-    self.mmove,self.wmove = false, false
-    self.mpos = {x=0, y=0, dx=0, dy=0}
+    CTRL.mouse,CTRL.wheel = false, false
+    CTRL.pos = {x=0, y=0, dx=0, dy=0}
 
-    self.mouse_tag = {['m1']=1,['m2']=2,['m3']=3,['m4']=4,['m5']=5}
-    self.mouse_but = {[1]='m1',[2]='m2',[3]='m3',[4]='m4',[5]='m5'}
+    CTRL.mousetag = {['m1']=1,['m2']=2,['m3']=3,['m4']=4,['m5']=5}
+    CTRL.mousebut = {[1]='m1',[2]='m2',[3]='m3',[4]='m4',[5]='m5'}
 
-    local ev = {'keypressed','keyreleased','mousepressed',
+    local events = {'keypressed','keyreleased','mousepressed',
             'mousereleased','mousemoved','wheelmoved','update'}
-    local init_love = {}
-    for i=1,#ev do
-        init_love[ev[i]] = love[ev[i]] or function() end
-        love[ev[i]] = function(...)
-            init_love[ev[i]](...)
-            self[ev[i]](self, ...)
+    local default = {}
+    for i=1,#events do
+        default[events[i]] = love[events[i]] or function() end
+        love[events[i]] = function(...)
+            local output = {default[events[i]](...)}
+            if #output>0 then
+                CTRL[events[i]](CTRL,unpack(output))
+                return unpack(output)
+            else CTRL[events[i]](CTRL, ...) end
         end
     end
 end
@@ -74,8 +77,8 @@ function CTRL:unbind(key)
         self.actions={} self.func={} self.combos={}
         return
     end
-    for action, key_act in pairs(self.actions) do
-        if key_act==key then
+    for action, key_ in pairs(self.actions) do
+        if key_==key then
             self.actions[action] = nil
             self.func[action] = nil
             self.combos[key] = nil
@@ -83,11 +86,9 @@ function CTRL:unbind(key)
     end
 end
 
-function CTRL:keyrepeat(bool) love.keyboard.setKeyRepeat(bool) end
-
 function CTRL:move(action)
     local key = self.actions[action]
-    if self.move_event[key] then
+    if self.moveevent[key] then
         if self.func[action] then self.func[action]() end
         return true
     end
@@ -95,8 +96,8 @@ end
 
 function CTRL:press(action)
     local key = self.actions[action]
-    if self.press_event[key] then
-        self.press_event[key] = nil
+    if self.pressevent[key] then
+        self.pressevent[key] = nil
         if self.func[action] then self.func[action]() end
         return true
     end
@@ -104,51 +105,51 @@ end
 
 function CTRL:release(action)
     local key = self.actions[action]
-    if self.release_event[key] then
-        self.release_event[key] = nil
+    if self.releaseevent[key] then
+        self.releaseevent[key] = nil
         if self.func[action] then self.func[action]() end
         return true
     end
 end
 
 function CTRL:position()
-    return self.mpos.x,self.mpos.y,self.mpos.dx,self.mpos.dy
+    return self.pos.x,self.pos.y,self.pos.dx,self.pos.dy
 end
 
 function CTRL:down(action, interval, delay)
     local key = self.actions[action]
 
-    if not self.press_event[key] and self.repeat_action[key] then
-        if self.repeat_action[key].done then self.repeat_action[key]=nil end
+    if not self.pressevent[key] and self.repeatevent[key] then
+        if self.repeatevent[key].done then self.repeatevent[key]=nil end
     end
 
     if interval and delay then
-        if self.press_event[key] and not self.repeat_action[key] then
-            self.repeat_action[key]={start=0, interval=interval, delay=delay,
+        if self.pressevent[key] and not self.repeatevent[key] then
+            self.repeatevent[key]={start=0, interval=interval, delay=delay,
                                         done=false}
-        elseif self.repeat_action[key] and self.repeat_action[key].done then
-            self.repeat_action[key].start = 0
-            self.repeat_action[key].done = false
+        elseif self.repeatevent[key] and self.repeatevent[key].done then
+            self.repeatevent[key].start = 0
+            self.repeatevent[key].done = false
             if self.func[action] then self.func[action]() end
             return true
         end
 
     elseif interval and not delay then
-        if self.press_event[key] and not self.repeat_action[key] then
+        if self.pressevent[key] and not self.repeatevent[key] then
 
-            self.repeat_action[key]={start=0, interval=interval, delay=0,
+            self.repeatevent[key]={start=0, interval=interval, delay=0,
                                         done=false}
             if self.func[action] then self.func[action]() end
             return true
-        elseif self.repeat_action[key] and self.repeat_action[key].done then
-            self.repeat_action[key].start = 0
-            self.repeat_action[key].done = false
+        elseif self.repeatevent[key] and self.repeatevent[key].done then
+            self.repeatevent[key].start = 0
+            self.repeatevent[key].done = false
             if self.func[action] then self.func[action]() end
             return true
         end
     else
-        if self.mouse_tag[key] then
-            if love.mouse.isDown(self.mouse_tag[key]) then
+        if self.mousetag[key] then
+            if love.mouse.isDown(self.mousetag[key]) then
                 if self.func[action] then self.func[action]() end
                 return true
             end
@@ -161,63 +162,65 @@ function CTRL:down(action, interval, delay)
     end
 end
 
+-- love
 function CTRL:keypressed(key,unicode)
-    self.press_event[key] = true
+    self.pressevent[key] = true
     -- combo
-    if self.init_combo and self.combos[self.init_combo..'+'..key] then
-        self.press_event[self.init_combo..'+'..key] = true
+    if self.combokey and self.combos[self.combokey..'+'..key] then
+        self.pressevent[self.combokey..'+'..key] = true
+        self.pressevent[key] = false
     end
-    if not self.init_combo then self.init_combo = key end
+    if not self.combokey then self.combokey = key end
 end
 
 function CTRL:keyreleased(key,unicode)
-    self.press_event[key] = nil
-    self.release_event[key] = true
-    if self.init_combo==key then self.init_combo = false end
+    self.pressevent[key] = nil
+    self.releaseevent[key] = true
+    if self.combokey==key then self.combokey = false end
 end
 
 function CTRL:mousepressed(x,y,button,istouch)
-    self.press_event[self.mouse_but[button]]=true
+    self.pressevent[self.mousebut[button]]=true
     -- double click
-    if self.timer_double then
-        local delta = love.timer.getTime()-self.timer_double
-        if self.time_double>delta and self.init_double==button then
-            self.press_event['double'] = true
+    if self.doubletimer then
+        local delta = love.timer.getTime()-self.doubletimer
+        if self.doubledelay>delta and self.doubleclick==button then
+            self.pressevent['double'] = true
             return
         end
     end
-    self.timer_double = love.timer.getTime()
-    self.init_double = button
+    self.doubletimer = love.timer.getTime()
+    self.doubleclick = button
 end
 
 function CTRL:mousereleased(x,y,button,istouch)
-    self.press_event[self.mouse_but[button]] = nil
-    self.release_event[self.mouse_but[button]] = true
+    self.pressevent[self.mousebut[button]] = nil
+    self.releaseevent[self.mousebut[button]] = true
 end
 
 function CTRL:mousemoved(x,y,dx,dy,istouch)
-    self.mmove = true
-    self.move_event['mmove'] = true
-    self.mpos = {x=x,y=y,dx=dx,dy=dy}
+    self.mouse = true
+    self.moveevent['mouse'] = true
+    self.pos = {x=x,y=y,dx=dx,dy=dy}
 end
 
 function CTRL:wheelmoved(x,y)
-    self.wmove=true
-    if x>0 then self.move_event['wright']=true end
-    if x<0 then self.move_event['wleft']=true end
-    if y>0 then self.move_event['wup']=true end
-    if y<0 then self.move_event['wdown']=true end
+    self.wheel=true
+    if x>0 then self.moveevent['wheelright']=true end
+    if x<0 then self.moveevent['wheelleft']=true end
+    if y>0 then self.moveevent['wheelup']=true end
+    if y<0 then self.moveevent['wheeldown']=true end
 end
 
 function CTRL:update(dt)
-    self.mmove, self.wmove = false, false
-    self.move_event['mmove'] = false
-    self.move_event['wup'] = false
-    self.move_event['wdown'] = false
-    self.move_event['wright'] = false
-    self.move_event['wleft'] = false
+    self.mouse, self.wheel = false, false
+    self.moveevent['mouse'] = false
+    self.moveevent['wheelup'] = false
+    self.moveevent['wheeldown'] = false
+    self.moveevent['wheelright'] = false
+    self.moveevent['wheelleft'] = false
 
-    for _, timer in pairs(self.repeat_action) do
+    for _, timer in pairs(self.repeatevent) do
         if timer and timer.delay>0 then timer.delay = timer.delay-dt end
         if timer and timer.delay<=0 then
             timer.start = timer.start+dt

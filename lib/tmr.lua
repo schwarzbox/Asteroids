@@ -26,8 +26,7 @@
 -- DEALINGS IN THE SOFTWARE.
 
 -- 2.0
--- add function with additional args ease elastic
--- meta function len
+-- add ease elastic
 
 -- Based on Tweener's easing functions (Penner's Easing Equations)
 
@@ -37,27 +36,29 @@
 -- time = total time
 -- step = step back
 
+-- if use timer inside objects (use loc=true)
+
 if arg[0] then print('1.0 TMR Timer (lua+love2d)', arg[0]) end
 if arg[1] then print('1.0 TMR Timer (lua+love2d)', arg[1]) end
 
--- old lua version
+-- lua<5.3
 local unpack = table.unpack or unpack
 local utf8 = require('utf8')
 
 local Ease = {}
 function Ease.linear(elapsed,st,diff,time) return diff*elapsed/time+st end
 
-function Ease.in_quad(elapsed,st,diff,time)
+function Ease.inQuad(elapsed,st,diff,time)
   elapsed = elapsed/time
   return diff*elapsed*elapsed+st
 end
 
-function Ease.out_quad(elapsed,st,diff,time)
+function Ease.outQuad(elapsed,st,diff,time)
   elapsed = elapsed/time
   return -diff*elapsed*(elapsed-2)+st
 end
 
-function Ease.in_out_quad(elapsed, st, diff, time)
+function Ease.inOutQuad(elapsed, st, diff, time)
     elapsed = elapsed/time*2
     if elapsed < 1 then
         return diff/2*elapsed*elapsed+st
@@ -66,47 +67,47 @@ function Ease.in_out_quad(elapsed, st, diff, time)
     end
 end
 
-function Ease.out_in_quad(elapsed,st,diff,time)
+function Ease.outInQuad(elapsed,st,diff,time)
     if elapsed < time/2 then
-      return Ease.out_quad(elapsed*2, st, diff/2, time)
+      return Ease.outQuad(elapsed*2, st, diff/2, time)
     else
-      return Ease.in_quad((elapsed*2)-time, st+diff/2, diff/2, time)
+      return Ease.inQuad((elapsed*2)-time, st+diff/2, diff/2, time)
     end
 end
 
-function Ease.in_out_cubic(elapsed,st,diff,time)
+function Ease.inOutCubic(elapsed,st,diff,time)
     elapsed = elapsed/time*2
     if elapsed<1 then return diff/2*elapsed*elapsed*elapsed+st end
     elapsed = elapsed-2
     return diff/2*(elapsed*elapsed*elapsed+2)+st
 end
 
-function Ease.in_cubic(elapsed,st,diff,time)
+function Ease.inCubic(elapsed,st,diff,time)
     elapsed = elapsed/time
     return diff*(elapsed*elapsed*elapsed)+st
 end
 
-function Ease.out_cubic(elapsed,st,diff,time)
+function Ease.outCubic(elapsed,st,diff,time)
     elapsed = elapsed/time-1
     return diff*((elapsed*elapsed*elapsed)+1)+st
 end
 
-function Ease.out_in_cubic(elapsed,st,diff,time)
+function Ease.outInCubic(elapsed,st,diff,time)
     if elapsed<time/2 then
-        return Ease.out_cubic(elapsed*2, st, diff/2, time)
+        return Ease.outCubic(elapsed*2, st, diff/2, time)
     else
-        return Ease.in_cubic((elapsed*2)-time, st+diff/2, diff/2, time)
+        return Ease.inCubic((elapsed*2)-time, st+diff/2, diff/2, time)
     end
 end
 
-function Ease.in_expo(elapsed,st,diff,time)
+function Ease.inExpo(elapsed,st,diff,time)
     if elapsed==0 then return st
     else
         return diff*math.pow(2, 10*(elapsed/time-1))+st-diff*0.001
     end
 end
 
-function  Ease.out_expo(elapsed,st,diff,time)
+function  Ease.outExpo(elapsed,st,diff,time)
     if elapsed==time then
         return st+diff
     else
@@ -114,7 +115,7 @@ function  Ease.out_expo(elapsed,st,diff,time)
     end
 end
 
-function Ease.in_out_expo(elapsed,st,diff,time)
+function Ease.inOutExpo(elapsed,st,diff,time)
     if elapsed==0 then return st end
     if elapsed==time then return st+diff end
     elapsed = elapsed/time*2
@@ -126,27 +127,27 @@ function Ease.in_out_expo(elapsed,st,diff,time)
     end
 end
 
-function Ease.out_in_expo(elapsed,st,diff,time)
+function Ease.outInExpo(elapsed,st,diff,time)
   if elapsed<time/2 then
-    return Ease.out_expo(elapsed*2, st, diff/2, time)
+    return Ease.outExpo(elapsed*2, st, diff/2, time)
   else
-    return Ease.in_expo((elapsed*2)-time, st+diff/2, diff/2, time)
+    return Ease.inExpo((elapsed*2)-time, st+diff/2, diff/2, time)
   end
 end
 
-function Ease.in_back(elapsed,st,diff,time,step)
+function Ease.inBack(elapsed,st,diff,time,step)
   if not step then step = 2.70158 end
   elapsed = elapsed / time
   return diff*elapsed*elapsed*((step+1)*elapsed-step)+st
 end
 
-function Ease.out_back(elapsed,st,diff,time,step)
+function Ease.outBack(elapsed,st,diff,time,step)
   if not step then step = 2.70158 end
   elapsed = elapsed/time-1
   return diff*(elapsed*elapsed*((step+1)*elapsed+step)+1)+st
 end
 
-function Ease.in_out_back(elapsed,st,diff,time,step)
+function Ease.inOutBack(elapsed,st,diff,time,step)
   if not step then step = 2.70158 end
   step = step*1.525
   elapsed = elapsed/time*2
@@ -158,15 +159,15 @@ function Ease.in_out_back(elapsed,st,diff,time,step)
   end
 end
 
-function Ease.out_in_back(elapsed,st,diff,time,s)
+function Ease.outInBack(elapsed,st,diff,time,s)
   if elapsed<time/2 then
-    return Ease.out_back(elapsed*2, st, diff/2, time, s)
+    return Ease.outBack(elapsed*2, st, diff/2, time, s)
   else
-    return Ease.in_back((elapsed*2)-time, st+diff/2, diff/2, time, s)
+    return Ease.inBack((elapsed*2)-time, st+diff/2, diff/2, time, s)
   end
 end
 
-function Ease.out_bounce(elapsed,st,diff,time)
+function Ease.outBounce(elapsed,st,diff,time)
     elapsed = elapsed/time
 
     if elapsed<1/2.75 then
@@ -183,48 +184,49 @@ function Ease.out_bounce(elapsed,st,diff,time)
     end
 end
 
-function Ease.in_bounce(elapsed,st,diff,time)
-    return diff-Ease.out_bounce(time-elapsed, 0, diff, time)+st
+function Ease.inBounce(elapsed,st,diff,time)
+    return diff-Ease.outBounce(time-elapsed, 0, diff, time)+st
 end
 
-function Ease.in_out_bounce(elapsed,st,diff,time)
+function Ease.inOutBounce(elapsed,st,diff,time)
     if elapsed<time/2 then
-        return Ease.in_bounce(elapsed*2, 0, diff, time)*0.5+st
+        return Ease.inBounce(elapsed*2, 0, diff, time)*0.5+st
     else
-        return Ease.out_bounce(elapsed*2-time, 0, diff, time)*0.5+diff*0.5+st
+        return Ease.outBounce(elapsed*2-time, 0, diff, time)*0.5+diff*0.5+st
     end
 end
 
-function Ease.out_in_bounce(elapsed,st,diff,time)
+function Ease.outInBounce(elapsed,st,diff,time)
     if elapsed<time/2 then
-        return Ease.out_bounce(elapsed*2, st, diff/2, time)
+        return Ease.outBounce(elapsed*2, st, diff/2, time)
     else
-        return Ease.in_bounce((elapsed*2)-time, st+diff/2, diff/2, time)
+        return Ease.inBounce((elapsed*2)-time, st+diff/2, diff/2, time)
     end
 end
 
 local TMR = {}
-function TMR:new()
+function TMR:new(loc)
     self.__index = self
-    self=setmetatable({},self)
+    self = setmetatable({},self)
+    self.alltmr = {}
     self:clear()
-    self.all_timers = {self.after_timers, self.every_timers,
-                        self.during_timers, self.tween_timers,
-                        self.script_timers}
 
-    if  love and love.update then
-        local loveupdate = love.update
-        love.update = function(...) loveupdate(...) self.update(self,...) end
-    else
-        local timerupdate=self.update
-        self.init_time=os.clock()
-        self.update = function(_,...)
-                        local dt = os.clock()-_.init_time
-                        _.dt=dt
-                        timerupdate(_,dt,...)
-                        _.init_time=_.init_time+dt
-                        return dt
-                    end
+    if not loc then
+        local update
+        if  love and love.update then
+            update = love.update
+            love.update = function(...) update(...) self.update(self,...) end
+        else
+            update = self.update
+            self.clock=os.clock()
+            self.update = function(_,...)
+                            local dt = os.clock()-_.clock
+                            _.dt=dt
+                            update(_,dt,...)
+                            _.clock=_.clock+dt
+                            return dt
+                        end
+        end
     end
 
     self.ease = Ease
@@ -232,69 +234,85 @@ function TMR:new()
     return self
 end
 
-function TMR.sleep(time)
-    local final_time=os.clock()+time
-    repeat until os.clock()>final_time
+function TMR.delete(self,timers,key)
+    for timer in pairs(timers) do
+        if timer.key and timer.key==key then self:remove(timer) end
+    end
 end
 
-function TMR:len()
+function TMR.sleep(time)
+    local final = os.clock()+time
+    repeat until os.clock()>final
+end
+
+function TMR:len(timers)
     local len = 0
-    for i=1,#self.all_timers do
-        local count=0
-        for _ in pairs(self.all_timers[i]) do
-            count = count+1
+    if timers then
+        for _ in pairs(timers) do len = len+1 end
+    else
+        for i=1,#self.alltmr do
+            local count=0
+            for _ in pairs(self.alltmr[i]) do
+                count = count+1
+            end
+            len = len+count
         end
-        len = len+count
     end
     return len
 end
 
-function TMR:cancel(timer)
-    for i=1,#self.all_timers do
-        self.all_timers[i][timer] = nil
+function TMR:remove(timer)
+    for i=1,#self.alltmr do
+        self.alltmr[i][timer] = nil
     end
 end
 
 function TMR:clear()
-    self.after_timers = {} self.every_timers = {}
-    self.during_timers = {} self.tween_timers = {}
-    self.script_timers = {}
+    for i=1, #self.alltmr do
+        for timer in pairs(self.alltmr[i]) do
+            self.alltmr[i][timer] = nil
+        end
+    end
+    self.aftertmr = {} self.everytmr = {}
+    self.duringtmr = {} self.tweentmr = {}
+    self.scripttmr = {}
+    self.alltmr = {self.aftertmr,self.everytmr,self.duringtmr,
+                    self.tweentmr,self.scripttmr}
 end
 
-function TMR:keycancel(timers,key)
-    for timer in pairs(timers) do
-        if timer.key and timer.key==key then self:cancel(timer) end
-    end
+function TMR:destroy()
+    self:clear()
+    self=nil
 end
 
 function TMR:after(time,func,key)
     local timer = {elapsed=0, time=time, func=func, key=key}
-    self:keycancel(self.after_timers,key)
-    self.after_timers[timer] = timer
+    TMR.delete(self, self.aftertmr,key)
+    self.aftertmr[timer] = timer
     return timer
 end
 
 function TMR:every(time,func,count,key)
     count = count or math.huge
     local timer ={elapsed=0, time=time, func=func, count=count, key=key}
-    self:keycancel(self.every_timers,key)
-    self.every_timers[timer]=timer
+    TMR.delete(self, self.everytmr,key)
+    self.everytmr[timer] = timer
     return timer
 end
 
 function TMR:during(time,func,after,key)
     after = after or function() end
     local timer = {elapsed=0, time=time, func=func, after=after, key=key}
-    self:keycancel(self.during_timers, key)
-    self.during_timers[timer] = timer
+    TMR.delete(self, self.duringtmr, key)
+    self.duringtmr[timer] = timer
     return timer
 end
 
-function TMR:script(func, key)
-    local coroutine_func = coroutine.wrap(func)
-    local timer = {func=coroutine_func, key=key}
-    self:keycancel(self.script_timers, key)
-    self.script_timers[timer] = timer
+function TMR:script(func,key)
+    local coroutinefunc = coroutine.wrap(func)
+    local timer = {func=coroutinefunc, key=key}
+    TMR.delete(self, self.scripttmr, key)
+    self.scripttmr[timer] = timer
 end
 
 function TMR:tween(time,init,fin,ease,after,key)
@@ -306,23 +324,23 @@ function TMR:tween(time,init,fin,ease,after,key)
 
     local timer = {elapsed=0, time=time, st=st,diff=diff, delta=init,
                                         ease=ease,after=after, key=key}
-    self:keycancel(self.tween_timers, key)
-    self.tween_timers[timer] = timer
+    TMR.delete(self, self.tweentmr, key)
+    self.tweentmr[timer] = timer
     return timer
 end
 
 function TMR:update(dt)
-    local remove = {}
-    for timer in pairs(self.after_timers) do
+    local trash = {}
+    for timer in pairs(self.aftertmr) do
         timer.elapsed = timer.elapsed+dt
         if timer.elapsed>=timer.time then
-            remove[#remove+1] = timer
+            trash[#trash+1] = timer
             timer.func()
         end
     end
 
-    for i in pairs(self.every_timers) do
-        local timer = self.every_timers[i]
+    for i in pairs(self.everytmr) do
+        local timer = self.everytmr[i]
         timer.elapsed = timer.elapsed+dt
         if timer.elapsed>=timer.time and timer.count>0 then
             timer.elapsed=0
@@ -330,41 +348,41 @@ function TMR:update(dt)
             timer.count = timer.count-1
         end
         if timer.count==0 then
-            remove[#remove+1] = timer
+            trash[#trash+1] = timer
         end
     end
 
-    for timer in pairs(self.during_timers) do
+    for timer in pairs(self.duringtmr) do
         timer.elapsed = timer.elapsed+dt
         timer.func()
         if timer.elapsed>=timer.time then
-            remove[#remove+1] = timer
+            trash[#trash+1] = timer
             timer.after()
         end
     end
 
-    for timer in pairs(self.script_timers) do
+    for timer in pairs(self.scripttmr) do
         -- on the fly create wait function with arg time
         timer.func(function(time)
                         self:after(time, timer.func)
                         coroutine.yield()
                     end)
-        remove[#remove+1] = timer
+        trash[#trash+1] = timer
     end
 
-    for timer in pairs(self.tween_timers) do
+    for timer in pairs(self.tweentmr) do
         timer.elapsed = timer.elapsed+dt
         for k,_ in pairs(timer.diff) do
             timer.delta[k] = self.ease[timer.ease](timer.elapsed,
                             timer.st[k], timer.diff[k], timer.time)
         end
         if timer.elapsed>=timer.time then
-            remove[#remove+1] = timer
+            trash[#trash+1] = timer
             if timer.after then timer.after() end
         end
     end
-    -- save remove
-    for i=1, #remove do self:cancel(remove[i]) end
+    -- clean trash
+    for i=1, #trash do self:remove(trash[i]) end
 end
 
 return TMR

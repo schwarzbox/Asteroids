@@ -17,7 +17,7 @@
 -- The above copyright notice and this permission notice shall be included in
 -- all copies or substantial portions of the Software.
 
--- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+-- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF AfNY KIND, EXPRESS OR
 -- IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 -- FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 -- AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
@@ -26,10 +26,13 @@
 -- DEALINGS IN THE SOFTWARE.
 
 -- 0.3
--- blend modes
--- improve splash
+-- improve gradient (circular linear)
+-- 1d array
+-- improve form data with color mapPixel?
+-- improve splash (with noise)
 
-if arg[1] then print('0.2 LOVIMG Image Functions (love2d)', arg[1]) end
+
+if arg[1] then print('0.25 LOVIMG Image Functions (love2d)', arg[1]) end
 
 -- old lua version
 local unpack = table.unpack or unpack
@@ -37,9 +40,24 @@ local utf8 = require('utf8')
 
 local EMPTY = {1,1,1,0}
 local WHITE = {1,1,1,1}
+local BLACK = {0,0,0,1}
 
 local IMD = {}
-function IMD.matrix_imd(matrix, color, scale)
+function IMD.fromData(imgdata)
+    local arr={}
+    local sx, sy=imgdata:getDimensions()
+    for y=1, sy do
+        local row={}
+        for x=1, sx do
+            local _,_,_,a = imgdata:getPixel(x-1, y-1)
+            if a==0 then row[x]=0 else row[x] = 1 end
+        end
+        arr[y] = row
+    end
+    return arr
+end
+
+function IMD.fromMatrix(matrix,color,scale)
     scale = scale or 1
     local sx = #matrix[1]
     local sy = #matrix
@@ -47,71 +65,17 @@ function IMD.matrix_imd(matrix, color, scale)
     for y=1,sy do
         for x=1,sx do
             if matrix[y][x] and matrix[y][x]~=0 then
-                data:setPixel((x-1),(y-1), unpack(color))
+                local value = matrix[y][x]
+                local clr = {value,value,value,1}
+                data:setPixel((x-1),(y-1), unpack(color or clr))
             end
         end
     end
-    if scale~=1 then data = IMD.resize_imd(data, scale) end
+    if scale~=1 then data = IMD.resize(data, scale) end
     return data
 end
 
-function IMD.resize_imd(image_data, scale)
-    scale = scale or 1
-    local sx, sy = image_data:getDimensions()
-    local data = love.image.newImageData(math.ceil(sx*scale),
-                                          math.ceil(sy*scale))
-    for x=1, sx do
-        for y=1, sy do
-            local r,g,b,a = image_data:getPixel(x-1, y-1)
-            local initx = math.floor((x-1)*scale)
-            local inity = math.floor((y-1)*scale)
-            data:setPixel(initx,inity, r,g,b,a )
-            for dx=0,scale-1 do
-                for dy=0,scale-1 do
-                    data:setPixel(initx+dx,inity+dy, r,g,b,a)
-                end
-            end
-        end
-    end
-    return data
-end
-
-function IMD.imgdata_mat(image_data)
-    local mat={}
-    local sx, sy=image_data:getDimensions()
-    for y=1, sy do
-        local row={}
-        for x=1, sx do
-            local _,_,_,a = image_data:getPixel(x-1, y-1)
-            if a==0 then row[x]=0 else row[x] = 1 end
-        end
-        mat[y] = row
-    end
-    return mat
-end
-
-function IMD.mask_imd(image_data,...)
-    local colors = {...}
-    if #colors==0 then colors={{0,0,0,1}} end
-    local color = colors[1]
-    local sx, sy = image_data:getDimensions()
-    local data = love.image.newImageData(sx,sy)
-    for x=1, sx do
-        for y=1, sy do
-            local _,_,_,a = image_data:getPixel(x-1, y-1)
-            if a~=0 then
-                if #colors>1 then
-                    color = colors[love.math.random(#colors)]
-                    color = {color[1],color[2],color[3],love.math.random()}
-                end
-                data:setPixel(x-1,y-1,unpack(color))
-            end
-        end
-    end
-    return data
-end
-
-function IMD.text_imd(text,size,color,fnt)
+function IMD.fromText(text,size,color,fnt)
     text = text or ' '
     size = size or 16
     color = color or WHITE
@@ -132,97 +96,29 @@ function IMD.text_imd(text,size,color,fnt)
     return data
 end
 
-function IMD.merge_imd(image_data1,image_data2,x,y,blend)
-    x = x or 0
-    y = y or 0
-    blend = blend or 'alpha'
-    local sx, sy = image_data1:getDimensions()
-    local canvas = love.graphics.newCanvas(sx,sy)
-    love.graphics.setCanvas(canvas)
-    love.graphics.setBlendMode(blend)
-    love.graphics.draw(love.graphics.newImage(image_data1))
-    love.graphics.draw(love.graphics.newImage(image_data2),x,y)
-    love.graphics.setBlendMode('alpha')
-    love.graphics.setCanvas()
-    local data = canvas:newImageData()
-    return data
-end
-
-function IMD.splash_imd(image_data,num,radius,maincolor,borcolor)
-    local sx, sy = image_data:getDimensions()
-    local data = love.image.newImageData(sx,sy)
-    data:paste(image_data,0,0,0,0,sx,sy)
-    num = num or 5
-    radius = radius or 10
-    radius = math.floor(math.min(radius,math.min(sx/2,sy/2)))-2
-    maincolor = maincolor or {0,0,0,0}
-    borcolor = borcolor or {0,0,0,1}
-    local mod = {{1,1},{-1,1},{1,-1},{-1,-1}}
-    for _=1,num do
-        local rand_radius=love.math.random(radius)
-        -- print(rand_radius)
-        local all_dots=IMD.circle_allpx(rand_radius)
-        local dots=IMD.circle_px(rand_radius)
-        local cenx=love.math.random(radius+2,sx-radius-2)
-        local ceny=love.math.random(radius+2,sy-radius-2)
-
-        for i=1, #all_dots do
-            if i%rand_radius==0 then
-                data:setPixel(cenx+all_dots[i][1],
-                              ceny+all_dots[i][2],maincolor)
-            end
-        end
-        for i=1,#dots do
-            local _,_,_,a = image_data:getPixel(cenx+dots[i][1],
-                                                ceny+dots[i][2])
-            if a>0  then
-                if i%rand_radius==0 then
-                    for m=1, #mod do
-                        data:setPixel(cenx+mod[m][1]+dots[i][1],
-                                  ceny+mod[m][2]+dots[i][2],
-                                {borcolor[1],borcolor[2],borcolor[3],
-                                love.math.random()})
-                    end
+function IMD.resize(imgdata,scale)
+    scale = scale or 1
+    local sx, sy = imgdata:getDimensions()
+    local data = love.image.newImageData(math.ceil(sx*scale),
+                                          math.ceil(sy*scale))
+    for x=1, sx do
+        for y=1, sy do
+            local r,g,b,a = imgdata:getPixel(x-1, y-1)
+            local initx = math.floor((x-1)*scale)
+            local inity = math.floor((y-1)*scale)
+            data:setPixel(initx,inity, r,g,b,a)
+            for dx=0,scale-1 do
+                for dy=0,scale-1 do
+                    data:setPixel(initx+dx,inity+dy, r,g,b,a)
                 end
             end
         end
-        for _=1,#dots/4 do
-            local coords=all_dots[love.math.random(#all_dots)]
-            for m=1,#mod do
-                data:setPixel(cenx+mod[m][1]+coords[1],
-                              ceny+mod[m][2]+coords[2],maincolor)
-            end
-        end
     end
     return data
 end
 
-function IMD.random_imd(sx,sy,num,blend,...)
-    local colors = {...}
-    if #colors==0 then colors={{1,1,1,1}} end
-    local canvas = love.graphics.newCanvas(sx,sy)
-    num = num or 10
-    blend = blend or 'alpha'
-    love.graphics.setCanvas(canvas)
-    love.graphics.setBlendMode(blend)
-    for color=1, #colors do
-        local points = {}
-        for i=1,num do
-            -- 0.5 offset
-            local x = love.math.random(sx)+0.5
-            local y = love.math.random(sy)+0.5
-            points[i]={x,y,unpack(colors[color])}
-        end
-        love.graphics.points(points)
-    end
-    love.graphics.setBlendMode('alpha')
-    love.graphics.setCanvas()
-    local data = canvas:newImageData()
-    return data
-end
-
-function IMD.rotate_imd(image_data, side)
-    local sx, sy = image_data:getDimensions()
+function IMD.rotate(imgdata,side)
+    local sx, sy = imgdata:getDimensions()
     local data
     if side=='CW' or side=='CCW' then
         data = love.image.newImageData(sy,sx)
@@ -233,7 +129,7 @@ function IMD.rotate_imd(image_data, side)
     local inity
     for x=1,sx do
         for y=1,sy do
-            local r,g,b,a = image_data:getPixel(x-1, y-1)
+            local r,g,b,a = imgdata:getPixel(x-1, y-1)
             if side=='CW' then
                 initx = sy-y
                 inity = x-1
@@ -256,26 +152,351 @@ function IMD.rotate_imd(image_data, side)
     return data
 end
 
-function IMD.slice_imd(image_data,tilex,tiley,numx,numy)
-    numx=numx or 1
-    numy=numy or 1
-    local sx, sy = image_data:getDimensions()
+function IMD.crop(imgdata,x1,y1,x2,y2)
+    local sx,sy = imgdata:getDimensions()
+    if not x1 and not y1 and not x2 and not y2 then
+        x1=sx y1=sy x2=0 y2=0
+        for x=1, sx do
+            for y=1, sy do
+                local _,_,_,a = imgdata:getPixel(x-1, y-1)
+                if a~=0 then
+                    if x<x1 then x1=x end
+                    if y<y1 then y1=y end
+                    if x>x2 then x2=x end
+                    if y>y2 then y2=y end
+                end
+            end
+        end
+    end
+    sx=x2-x1
+    sy=y2-y1
+    local data=love.image.newImageData(sx,sy)
+    data:paste(imgdata,0,0,x1,y1,sx,sy)
+    return data
+end
+
+function IMD.quads(imgdata,wid,hei,cols,rows)
+    local quads = {}
+    local sx, sy = imgdata:getDimensions()
+    for y=0,rows-1 do
+        for x=0,cols-1 do
+            quads[#quads+1]=love.graphics.newQuad(
+                    wid*x,hei*y,wid,hei,sx,sy)
+        end
+    end
+    return quads
+end
+
+function IMD.slice(imgdata,wid,hei,cols,rows)
+    cols = cols or 1
+    rows = rows or 1
+    local sx, sy = imgdata:getDimensions()
     local arr = {}
-    for y=0,numy-1 do
-        for x=0,numx-1 do
-            local data = love.image.newImageData(tilex,tiley)
+    for y=0,rows-1 do
+        for x=0,cols-1 do
+            local data = love.image.newImageData(wid,hei)
             -- source, destx, desty, sourcex, sourcey, source wid, source hei
-            data:paste(image_data,0,0,x*tilex, y*tiley,sx,sy)
+            data:paste(imgdata,0,0,x*wid, y*hei,sx,sy)
             arr[#arr+1] = data
         end
     end
     return arr
 end
 
-function IMD.circle_allpx(radius)
+function IMD.mask(imgdata,color,randalpha)
+    color = color or BLACK
+    local sx, sy = imgdata:getDimensions()
+    local data = love.image.newImageData(sx,sy)
+    for x=1, sx do
+        for y=1, sy do
+            local _,_,_,a = imgdata:getPixel(x-1, y-1)
+            if a~=0 then
+                if randalpha then
+                    color = {color[1],color[2],color[3],love.math.random()}
+                end
+                data:setPixel(x-1,y-1, unpack(color))
+            end
+        end
+    end
+    return data
+end
+
+-- blend
+-- add subtract replace screen
+function IMD.merge(imgdata1,imgdata2,x,y,blend)
+    x = x or 0
+    y = y or 0
+    blend = blend or 'alpha'
+    local sx, sy = imgdata1:getDimensions()
+    local canvas = love.graphics.newCanvas(sx,sy)
+    love.graphics.setCanvas(canvas)
+    love.graphics.setBlendMode(blend)
+    love.graphics.draw(love.graphics.newImage(imgdata1))
+    love.graphics.draw(love.graphics.newImage(imgdata2),x,y)
+    love.graphics.setBlendMode('alpha')
+    love.graphics.setCanvas()
+    local data = canvas:newImageData()
+    return data
+end
+
+function IMD.concat(imgdata1,imgdata2,side)
+    side = side or 'right'
+    local sx1, sy1 = imgdata1:getDimensions()
+    local sx2, sy2 = imgdata2:getDimensions()
+    local sx = (sx1>sx2) and sx1 or sx2
+    local sy = (sy1>sy2) and sy1 or sy2
+
+    local x1,y1, x2,y2, canvas
+    if side == 'left' then
+        canvas = love.graphics.newCanvas(sx1+sx2,sy)
+        x1,y1 = sx2,0
+        x2,y2 = 0,0
+    elseif side == 'top' then
+        canvas = love.graphics.newCanvas(sx,sy1+sy2)
+        x1,y1 = 0,sy2
+        x2,y2 = 0,0
+    elseif side == 'bot' then
+        canvas = love.graphics.newCanvas(sx,sy1+sy2)
+        x1,y1 = 0,0
+        x2,y2 = 0,sy1
+    else
+        canvas = love.graphics.newCanvas(sx1+sx2,sy)
+        x1,y1 = 0,0
+        x2,y2 = sx1,0
+    end
+    love.graphics.setCanvas(canvas)
+    love.graphics.draw(love.graphics.newImage(imgdata1),x1,y1)
+    love.graphics.draw(love.graphics.newImage(imgdata2),x2,y2)
+    love.graphics.setCanvas()
+    local data = canvas:newImageData()
+    return data
+end
+
+function IMD.splash(imgdata,num,radius,background,border)
+    local sx, sy = imgdata:getDimensions()
+    local data = love.image.newImageData(sx,sy)
+    data:paste(imgdata,0,0,0,0,sx,sy)
+    num = num or 5
+    radius = radius or 10
+    radius = math.floor(math.min(radius,math.min(sx/2,sy/2)))-2
+    background = background or {0,0,0,0}
+    border = border or {0,0,0,1}
+    local mod = {{1,1},{-1,1},{1,-1},{-1,-1}}
+    for _=1,num do
+        local randrad = love.math.random(radius)
+        local allpx = IMD.circleAllPixels(randrad)
+        local dots = IMD.circlePixels(randrad)
+        local cenx = love.math.random(radius+2,sx-radius-2)
+        local ceny = love.math.random(radius+2,sy-radius-2)
+
+        for i=1, #allpx do
+            if i%randrad==0 then
+                data:setPixel(cenx+allpx[i][1],
+                              ceny+allpx[i][2],background)
+            end
+        end
+        for i=1,#dots do
+            local _,_,_,a = imgdata:getPixel(cenx+dots[i][1],
+                                                ceny+dots[i][2])
+            if a>0  then
+                if i%randrad==0 then
+                    for m=1, #mod do
+                        data:setPixel(cenx+mod[m][1]+dots[i][1],
+                                  ceny+mod[m][2]+dots[i][2],
+                                {border[1],border[2],border[3],
+                                love.math.random()})
+                    end
+                end
+            end
+        end
+        for _=1,#dots/4 do
+            local coords=allpx[love.math.random(#allpx)]
+            for m=1,#mod do
+                data:setPixel(cenx+mod[m][1]+coords[1],
+                              ceny+mod[m][2]+coords[2],background)
+            end
+        end
+    end
+    return data
+end
+
+function IMD.rand(imgdata,num,fill,...)
+    local sx, sy = imgdata:getDimensions()
+    fill = fill or false
+    num = num or 10
+    local colors = {...}
+    if #colors==0 then colors = {BLACK} end
+    local color = colors[1]
+    for _=1,num do
+        local a = 0
+        local x = love.math.random(1,sx)
+        local y = love.math.random(1,sy)
+        while a==0 and fill do
+            x = love.math.random(1,sx)
+            y = love.math.random(1,sy)
+            _,_,_,a = imgdata:getPixel(x-1, y-1)
+        end
+        if #colors>1 then
+            color = colors[love.math.random(#colors)]
+        end
+        imgdata:setPixel(x-1,y-1,unpack(color))
+    end
+    return imgdata
+end
+
+function IMD.gradient(imgdata)
+    local sx, sy = imgdata:getDimensions()
+    local data = love.image.newImageData(sx,sy)
+    local msx,msy = math.floor(sx/2), math.floor(sy/2)
+    local r,g,b,a = imgdata:getPixel(msx, msy)
+    local step = a/msx
+    for i=1,msx do
+        local tmp = IMD.circlePixels(i-1)
+        a = a - step
+        for j=1, #tmp do
+            data:setPixel(msx+tmp[j][1], msy+tmp[j][2],{r,g,b,a})
+        end
+    end
+    return data
+end
+
+function IMD.blur(imgdata,radius,step)
+    local sx, sy = imgdata:getDimensions()
+    local data = love.image.newImageData(sx,sy)
+    radius=radius or 4
+    step=step or 1
+    local allpx = IMD.circleAllPixels(radius)
+    for x=1, sx,step do
+        for y=1, sy,step do
+            local r,g,b,a
+            local sum={0,0,0,0}
+            local total=0
+            for i=1,#allpx do
+                local locx=(x-1)+allpx[i][1]
+                local locy=(y-1)+allpx[i][2]
+
+                if locx>0 and locx<sx and locy>0 and locy<sy then
+                    r,g,b,a=imgdata:getPixel(locx,locy)
+                    sum[1]=sum[1]+r
+                    sum[2]=sum[2]+g
+                    sum[3]=sum[3]+b
+                    sum[4]=sum[4]+a
+                    total=total+1
+                end
+            end
+            data:setPixel(x-1, y-1,{sum[1]/total,sum[2]/total,
+                                    sum[3]/total,sum[4]/total})
+        end
+    end
+    return data
+end
+
+function IMD.contrast(imgdata,contrast)
+    local sx, sy = imgdata:getDimensions()
+    local data = love.image.newImageData(sx,sy)
+    for x=1, sx do
+        for y=1, sy do
+            local r,g,b,a = imgdata:getPixel(x-1, y-1)
+            if a>contrast then
+                data:setPixel(x-1,y-1, r,g,b,1)
+            end
+        end
+    end
+    return data
+end
+
+function IMD.form(form,color,sx,sy,vertex)
+    form = form or 'line'
+    sx = sx>=1 and sx or 1
+    sy = sy>=1 and sy or sx
+    vertex = vertex or {}
+    if form == 'triangle' then
+        vertex = {0,0,sx,sy/2,0,sy}
+    elseif form == 'hexagon' then
+        local hexside = sx/2
+        local nwpoint = hexside - hexside/2
+        local nepoint = hexside + hexside/2
+        vertex={nwpoint,0,nepoint,0,sx,hexside,nepoint,sx,nwpoint,sx,0,hexside}
+    elseif form == 'star' then
+        local midwid = sx/2
+        local midhei = sy/2
+        local thidrdwid = sx/3
+        local thirdhei = sy/3
+        vertex={0,0,thidrdwid,thirdhei,midwid,0,midwid,thirdhei,
+                sx,midhei,midwid,sy-thirdhei,midwid,sy,
+                thidrdwid,sy-thirdhei,0,sy,midwid/2,midhei,0,0}
+    end
+
+    color = color or WHITE
+    local forms = {
+        ['circle']=function() love.graphics.circle('fill',sx/2,sy/2,sx/2) end,
+        ['ellipse']=function()
+                    love.graphics.ellipse('fill',sx/2,sy/2,sx/2,sy/2,32) end,
+        ['triangle']=function() love.graphics.polygon('fill',vertex) end,
+        ['rectangle']=function()love.graphics.rectangle('fill',0,0,sx,sy) end,
+        ['hexagon']=function() love.graphics.polygon('fill',vertex) end,
+        ['star']=function() love.graphics.line(vertex) end,
+        ['polygon']=function() love.graphics.polygon('fill',vertex) end,
+        ['line']=function() love.graphics.line(vertex) end
+    }
+
+    local canvas = love.graphics.newCanvas(sx,sy)
+    love.graphics.setCanvas(canvas)
+    love.graphics.setColor(color)
+    forms[form]()
+    love.graphics.setColor(WHITE)
+    love.graphics.setCanvas()
+    local data = canvas:newImageData()
+    return data
+end
+
+function IMD.tree(ln,sz,ang,rang,rlen,rnode)
+    local function drawTree(len,size,angle,randang,randlen,randnode)
+        love.graphics.setLineWidth(size)
+        local length=len
+        if randlen then length=love.math.random(len) end
+        love.graphics.line(0,0,0,-length)
+        love.graphics.translate(0,-length)
+
+        len=len*0.66
+        size=size*0.77
+        if len>2 then
+            local nodes = 2
+            if randnode then
+                nodes=love.math.random(4)
+            end
+            for i=1,nodes do
+                local alpha=angle
+                if randang then
+                    alpha=(love.math.random()*2-1)*math.pi/3
+                else
+                    if i==2 then alpha=-angle end
+                end
+                love.graphics.push()
+                love.graphics.rotate(alpha)
+                drawTree(len,size,angle,randang,randlen,randnode)
+                love.graphics.pop()
+            end
+        end
+    end
+    local sx=ln*8
+    local sy=ln*8
+    local canvas = love.graphics.newCanvas(sx,sy)
+    love.graphics.setCanvas(canvas)
+    love.graphics.push()
+    love.graphics.translate(sx/2,sy/2)
+    drawTree(ln,sz,ang,rang,rlen,rnode)
+    love.graphics.pop()
+    love.graphics.setLineWidth(1)
+    love.graphics.setCanvas()
+    local data = canvas:newImageData()
+    return data
+end
+
+function IMD.circleAllPixels(radius)
     local  arr = {}
     for i=1,radius do
-        local tmp = IMD.circle_px(i)
+        local tmp = IMD.circlePixels(i)
         for j=1, #tmp do
             arr[#arr+1] = tmp[j]
         end
@@ -283,13 +504,13 @@ function IMD.circle_allpx(radius)
     return arr
 end
 
-function IMD.circle_px(radius)
-    local  arr = {}
+function IMD.circlePixels(radius)
+    local arr = {}
     for grad=0,359 do
         grad = math.rad(grad)
-        local xdot = radius * math.cos(grad)
-        local ydot = radius * math.sin(grad)
-        arr[#arr+1] = {xdot, ydot}
+        local dotx = radius * math.cos(grad)
+        local doty = radius * math.sin(grad)
+        arr[#arr+1] = {dotx, doty}
     end
     return arr
 end

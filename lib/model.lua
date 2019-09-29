@@ -12,26 +12,26 @@ local set = require('lib/set')
 local Model = {}
 Model.tag = 'model'
 -- static cmp
-Model.get_hypot = cmp.get_hypot
-Model.get_randxy = cmp.get_randxy
+Model.getHypot = cmp.getHypot
+Model.getRandOffsetXY = cmp.getRandOffsetXY
 -- particle
-Model.local_particle=cmp.local_particle
+Model.objectParticle = cmp.objectParticle
 function Model:new()
     self.ships = {wasp=obj.Wasp,wing=obj.Wing}
     -- load data
-    local olddata = fl.load_love(set.SAVE) or {1,0}
+    local olddata = fl.loadLove(set.SAVE) or {1,0}
     self.lastscore = 0
     self.maxlevel = olddata[1]
     self.maxscore = olddata[2]
     -- radar
     self.radar = {x1=627,y1=set.HEI-164,x2=676,y2=set.HEI-131}
-    self.radius = self.get_hypot(self.radar.x1,self.radar.y1,
+    self.radius = self.getHypot(self.radar.x1,self.radar.y1,
                                 self.radar.x2,self.radar.y2)
     self.old_radarx,self.old_radary=self.radar.x2,self.radar.y2
     self.radar_min = 1
     self.radar_max = 360
-    self.border = imd.circle_px(self.radius)
-    self.all_dots = imd.circle_allpx(self.radius-20)
+    self.border = imd.circlePixels(self.radius)
+    self.all_dots = imd.circleAllPixels(self.radius-20)
 
     self.tmr = Tmr:new()
     -- sound bool
@@ -42,7 +42,7 @@ function Model:new()
 end
 
 function Model:reset()
-    self.particle ={}
+    self.particles = {}
     self.objects = {}
     self.avatar = nil
     self.level = {val=self.maxlevel}
@@ -61,10 +61,10 @@ function Model:reset()
     self.fade = 64/255
     self.fin = false
     -- menu&game particles
-    self.dust=self:local_particle(7, {set.WHITEFF,set.ORANGE,set.DARKGRAYF},
+    self.dust=self:objectParticle(7, {set.WHITEFF,set.ORANGE,set.DARKGRAYF},
                                      'circle', {5,30}, {0.1,0.6},15)
 
-    self.grdust=self:local_particle(11, {set.WHITEFF,set.LIGHTGRAY,set.GRAYF},
+    self.grdust=self:objectParticle(11, {set.WHITEFF,set.LIGHTGRAY,set.GRAYF},
                                      'circle', {5,40}, {0.1,0.4},10)
     -- menu music
     set.AUD['intro']:setLooping(true)
@@ -76,7 +76,7 @@ end
 function Model:spawn(item) self.objects[item] = item end
 function Model:destroy(item) self.objects[item] = nil end
 function Model:get_objects() return self.objects end
-function Model:get_particle() return self.particle end
+function Model:get_particles() return self.particles end
 function Model:get_fade() return self.fade end
 
 function Model:set_pause(pause)
@@ -87,29 +87,30 @@ function Model:set_pause(pause)
 end
 
 function Model:startgame()
-    -- update bind for space
-    Ctrl:unbind('space')
-    Ctrl:bind('space','fire')
+    if not self.avatar then
+        -- update bind for space
+        Ctrl:unbind('space')
+        Ctrl:bind('space','fire')
 
-    set.AUD['intro']:stop()
-    self.avatar = self.ships[View:get_avatar()]{x=set.MIDWID,
-                                                   y=set.MIDHEI}
+        set.AUD['intro']:stop()
 
-    self.fog = self:local_particle({1}, {set.WHITEFF,set.WHITEF,set.WHITEFF},
-                                     set.OBJ['cloud'], {6,15}, {0.1,15},1)
-    self.fog.particle:setRotation(0.3, 1.5)
-    self.fog.particle:setEmitterLifetime(-1)
-    self.fog.particle:emit(1)
+        self.avatar = self.ships[View:get_avatar()]{x=set.MIDWID,
+                                                       y=set.MIDHEI}
 
-    set.AUD['loop']:setVolume(self.volume)
-    set.AUD['loop']:setLooping(true)
-    set.AUD['loop']:play()
-    -- fade
-    self.tmr:after(0.3, function () View:set_game_scr() end)
-    -- protect double click
-    self.tmr.sleep(0.3)
-    set.AUD['fly']:play()
+        self.fog = self:objectParticle({1}, {set.WHITEFF,set.WHITEF,set.WHITEFF},
+                            set.IMG['cloud'], {6,15}, {0.1,15},1,{0.1,0.3})
+        self.fog.particle:setRotation(0.1, 0.3)
+        self.fog.particle:setEmitterLifetime(-1)
+        self.fog.particle:emit(1)
 
+        set.AUD['loop']:setVolume(self.volume)
+        set.AUD['loop']:setLooping(true)
+        set.AUD['loop']:play()
+        -- fade
+        self.tmr:after(0.5, function () View:set_game_scr() end)
+
+        set.AUD['fly']:play()
+    end
 end
 
 function Model:update(dt)
@@ -131,12 +132,12 @@ function Model:update(dt)
             for k,_ in pairs(set.AUD) do
                 if k~='loop' and k~='intro' then set.AUD[k]:setVolume(1) end
             end
-            set.AUD['rocket_destroy']:setVolume(set.BOOMV)
+            set.AUD['rocketdestroy']:setVolume(set.BOOMV)
             set.AUD['bullet']:setVolume(set.BULV)
             set.AUD['shipboom']:setVolume(set.BOOMV)
             set.AUD['engine']:setVolume(set.ENGV)
-            set.AUD['hit_ship']:setVolume(set.HITV)
-            set.AUD['hit_aster']:setVolume(set.HITV)
+            set.AUD['hitship']:setVolume(set.HITV)
+            set.AUD['hitaster']:setVolume(set.HITV)
         end
         self.old_radarx, self.old_radary = self.radar.x2, self.radar.y2
         self.radar.x2 = self.radar.x1+self.border[self.radar_min][1]
@@ -144,12 +145,14 @@ function Model:update(dt)
         self.radar_min = ((self.radar_min+1)%self.radar_max)+1
     end
     -- particle menu & game
-    for particle in pairs(self.particle) do
+    for particle in pairs(self.particles) do
         particle:update(dt)
-        if particle:getCount()==0 then particle:reset() end
+        if particle:getCount()==0 then
+            particle:reset()
+        end
     end
 
-    local randx,randy = self.get_randxy(nil,nil,set.WID,set.HEI,'rand')
+    local randx,randy = self.getRandOffsetXY(nil,nil,set.WID,set.HEI,'rand')
 
     self.dust.particle:emit(1)
     self.dust.particle:setPosition(randx,randy)
@@ -168,11 +171,11 @@ function Model:update(dt)
 
         -- collision
         for object in pairs(self.objects) do
-            object.last_collision = {}
+            object.lastcoll = {}
             for collider in pairs(self.objects) do
                 object:collision(collider,dt)
             end
-            if #object.last_collision == 0 then
+            if #object.lastcoll == 0 then
                 object.collide=nil
             end
         end
@@ -185,8 +188,8 @@ function Model:update(dt)
 
         -- new level
         if num_aster==0 then self.level.val = self.level.val+1
-            self.fade=0.5
-            self.volume=0
+            self.fade = 0.4
+            self.volume = 0
             if self.audio.bool then
                 self.tmr:tween(2, self, {volume=set.LOOPV})
                 self.tmr:during(2,function()
@@ -214,12 +217,12 @@ function Model:endgame()
 
     self.level.val = self.level.val-1
     local data = {self.level.val,self.score}
-    local olddata = fl.load_love(set.SAVE)
+    local olddata = fl.loadLove(set.SAVE)
     if olddata then
         if olddata[1]>data[1] then data[1] = olddata[1] end
         if olddata[2]>data[2] then data[2] = olddata[2] end
     end
-    fl.save_love(set.SAVE,string.format('return {%i,%i}',data[1],data[2]))
+    fl.saveLove(set.SAVE,string.format('return {%i,%i}',data[1],data[2]))
     self.maxlevel, self.maxscore = data[1],data[2]
     self.lastscore = self.score
     self:reset()

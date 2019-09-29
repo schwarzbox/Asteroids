@@ -4,10 +4,10 @@
 
 local fl = require('lib/lovfl')
 local set = {
-    GAMENAME = 'Asteroids!',
-    SAVE = 'asteroids!_save.lua',
-    VER = '2.0',
-    FULLSCR = false,
+    APPNAME = 'Asteroids!',
+    SAVE = 'asteroids!save.lua',
+    VER = '2.5',
+    FULLSCR = love.window.getFullscreen(),
     WID = love.graphics.getWidth(),
     HEI = love.graphics.getHeight(),
     MIDWID = love.graphics.getWidth() / 2,
@@ -50,7 +50,7 @@ local set = {
 
     MAINFNT = 'res/fnt/slkscr.ttf',
 
-    OBJ = {},
+    IMG = {},
     AUD = {},
     -- default sound
     LOOPV = 0.3,
@@ -65,11 +65,11 @@ set.MENUFNT = {set.MAINFNT,32}
 set.GAMEFNT = {set.MAINFNT,16}
 set.UIFNT = {set.MAINFNT,8}
 
-for k,path in pairs(fl.load_all('res/img','png')) do
-    set.OBJ[k] = love.image.newImageData(path)
+for k,path in pairs(fl.loadAll('res/img','png')) do
+    set.IMG[k] = love.image.newImageData(path)
 end
 
-for k,path in pairs(fl.load_all('res/aud','wav','mp3')) do
+for k,path in pairs(fl.loadAll('res/aud','wav','mp3')) do
     if path:match('[^.]+$')=='wav' then
         set.AUD[k] = love.audio.newSource(path,'static')
     else

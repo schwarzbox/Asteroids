@@ -1,12 +1,12 @@
--- conf love2d ASTEROIDS
+-- conf ASTEROIDS
 
 function love.conf(t)
     -- The name of the save directory (string)
-    t.identity = 'Asteroids!data'
+    t.identity = 'Asteroids!Data'
     -- Search files in source directory before save directory (boolean)
     t.appendidentity = false
     -- The LÖVE ver this game was made for (string)
-    t.ver = '11.1'
+    t.ver = '11.2'
     -- Attach a console (boolean, Windows only)
     t.console = false
     -- Enable the accelerometer on iOS and Android by exposing it as a Joystick (boolean)

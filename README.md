@@ -1,12 +1,14 @@
 # Asteroids!-LÖVE
 
-Asteroids! is a simple shoot them all game.
+"Asteroids!" is a simple Shoot Them All game.
 
 Goal: Destroy all asteroids.
 
 Controls: 'W' - forward, 'A' - rotate right, 'D' - rotate left, 'SPACE' - fire.
 
 Made with Love2d and some self-made libraries on top of Love Engine.
+
+Music by [Eric Matyas](www.soundimage.org)
 
 [Release available for Mac OS 64-bit & for Windows 32-bit](https://github.com/schwarzbox/Asteroids-Love2d/releases)
 
