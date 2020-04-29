@@ -1,6 +1,6 @@
 #!/usr/bin/env love
 -- ASTEROIDS
--- 2.5
+-- 3.0
 -- Game (love2d)
 -- main.lua
 
@@ -28,10 +28,8 @@
 -- Music by Eric Matyas
 -- www.soundimage.org
 
--- 3.0
--- help for controls
--- bounce rocket
--- bounce aster (born separetly)
+-- 3.5
+-- bonuses
 
 local imd = require('lib/lovimd')
 
@@ -74,8 +72,8 @@ end
 
 -- dt around 0.016618420952
 function love.update(dt)
-    local upd_title = string.format('%s %s fps %.2d', set.APPNAME, set.VER,
-                                    love.timer.getFPS())
+
+    local upd_title = string.format('%s %s', set.APPNAME, set.VER)
     love.window.setTitle(upd_title)
 
     -- update model

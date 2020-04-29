@@ -73,6 +73,7 @@ function View:set_game_scr()
     ui.Manager.clear()
 end
 
+
 function View:set_label(text,bool)
     local x = set.MIDWID
     local y = set.MIDHEI

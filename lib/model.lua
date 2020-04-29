@@ -44,11 +44,12 @@ end
 function Model:reset()
     self.particles = {}
     self.objects = {}
+
     self.avatar = nil
     self.level = {val=self.maxlevel}
     self.score = 0
     self.pause = false
-
+    self.next = true
     -- radar dots update
     self.aster_coords = {}
     for i=1, self.maxlevel do
@@ -62,10 +63,10 @@ function Model:reset()
     self.fin = false
     -- menu&game particles
     self.dust=self:objectParticle(7, {set.WHITEFF,set.ORANGE,set.DARKGRAYF},
-                                     'circle', {5,30}, {0.1,0.6},15)
+                                     'circle', {1,5}, {0.1,0.6},15)
 
     self.grdust=self:objectParticle(11, {set.WHITEFF,set.LIGHTGRAY,set.GRAYF},
-                                     'circle', {5,40}, {0.1,0.4},10)
+                                     'circle', {5,10}, {0.1,0.4},10)
     -- menu music
     set.AUD['intro']:setLooping(true)
     set.AUD['intro']:play()
@@ -97,7 +98,8 @@ function Model:startgame()
         self.avatar = self.ships[View:get_avatar()]{x=set.MIDWID,
                                                        y=set.MIDHEI}
 
-        self.fog = self:objectParticle({1}, {set.WHITEFF,set.WHITEF,set.WHITEFF},
+        self.fog = self:objectParticle({1},
+                                       {set.WHITEFF,set.WHITEF,set.WHITEFF},
                             set.IMG['cloud'], {6,15}, {0.1,15},1,{0.1,0.3})
         self.fog.particle:setRotation(0.1, 0.3)
         self.fog.particle:setEmitterLifetime(-1)
@@ -144,13 +146,7 @@ function Model:update(dt)
         self.radar.y2 = self.radar.y1+self.border[self.radar_min][2]
         self.radar_min = ((self.radar_min+1)%self.radar_max)+1
     end
-    -- particle menu & game
-    for particle in pairs(self.particles) do
-        particle:update(dt)
-        if particle:getCount()==0 then
-            particle:reset()
-        end
-    end
+
 
     local randx,randy = self.getRandOffsetXY(nil,nil,set.WID,set.HEI,'rand')
 
@@ -163,8 +159,9 @@ function Model:update(dt)
     -- game
     if View:get_scr()=='game_scr' then
         if self.pause then return end
+
         -- clouds
-        self.fog.particle:setEmissionRate(love.math.random(1,3))
+        self.fog.particle:setEmissionRate(love.math.random(1,2))
         self.fog.particle:setPosition(randx,randy)
 
         local num_aster = 0
@@ -180,23 +177,30 @@ function Model:update(dt)
             end
         end
 
-        -- update objects
+         -- update objects
         for object in pairs(self.objects) do
             if object.update then object:update(dt) end
             if object.tag=='aster' then num_aster = num_aster+1 end
         end
 
         -- new level
-        if num_aster==0 then self.level.val = self.level.val+1
-            self.fade = 0.4
+        if num_aster==0 then
+            self.level.val = self.level.val+1
+
+            self.particles={[self.fog.particle]=self.fog.particle,
+                            [self.dust.particle]=self.dust.particle,
+                            [self.grdust.particle]=self.grdust.particle}
+
+            self.fade = 0.5
             self.volume = 0
             if self.audio.bool then
-                self.tmr:tween(2, self, {volume=set.LOOPV})
-                self.tmr:during(2,function()
-                                set.AUD['loop']:setVolume(self.volume) end)
+                self.tmr:tween(2.5, self, {volume=set.LOOPV})
+                self.tmr:during(2.5,function()
+                            set.AUD['loop']:setVolume(self.volume) end)
             end
-            self.tmr:tween(2, self, {fade=1})
+            self.tmr:tween(2.5, self, {fade=1},'linear')
             set.AUD['level']:play()
+
             for _=1,self.level.val-1 do
                 obj.Asteroid()
             end
@@ -208,6 +212,16 @@ function Model:update(dt)
                                 function () self:endgame() end) end)
         end
     end
+
+       -- particle menu & game
+    for particle in pairs(self.particles) do
+        particle:update(dt)
+        if particle:getCount()==0 then
+            particle:reset()
+            self.particles[particle] = nil
+        end
+    end
+
     -- ui update
     View:get_ui().Manager.update(dt)
 end

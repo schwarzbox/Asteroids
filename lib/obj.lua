@@ -16,6 +16,7 @@ O.Base.setObject = cmp.setObject
 O.Base.borders = cmp.infinityScreen
 O.Base.move = cmp.move
 O.Base.rotate = cmp.rotate
+O.Base.getDirection = cmp.getDirection
 O.Base.linearDamping = cmp.linearDamping
 O.Base.angularDamping = cmp.angularDamping
 O.Base.collision = cmp.collision
@@ -51,9 +52,9 @@ end
 function O.Base:stop_rotate(dt)
     if self.auto_stop then
         if self.da>self.torque then
-            self:rotate(-0.5)
+            self:rotate(-0.6)
         elseif self.da<-self.torque then
-            self:rotate(0.5)
+            self:rotate(0.6)
         else
             self:angularDamping(dt)
         end
@@ -76,17 +77,18 @@ function O.Base:destroy()
     set.AUD['shipboom']:play()
 
     for particle in pairs(self.particles) do particle:reset() end
-
+    self.particle = {}
     self.node:destroy(self)
 end
 
 O.Wasp = cls.Class(O.Base,{tag='wasp'})
 -- const
 O.Wasp.imgdata = set.IMG[O.Wasp.tag]
-O.Wasp.speed = 3
-O.Wasp.maxspeed = 160
-O.Wasp.torque = math.rad(2)
-O.Wasp.maxtorque = math.rad(100)
+O.Wasp.speed = 8
+O.Wasp.maxspeed = 220
+O.Wasp.torque = math.rad(6)
+O.Wasp.maxtorque = math.rad(200)
+O.Wasp.damage = 2
 O.Wasp.hp = 4
 -- cmp
 O.Wasp.shot = cmp.shot
@@ -159,6 +161,8 @@ function O.Wasp:update(dt)
                           -math.abs(self.dx+self.dy)/2)
         self.wounded3.particle:emit(1)
     end
+
+    self:linearDamping(dt/2)
     self:stop_rotate(dt)
 end
 
@@ -166,10 +170,11 @@ end
 O.Wing = cls.Class(O.Base,{tag = 'wing'})
 -- const
 O.Wing.imgdata = set.IMG[O.Wing.tag]
-O.Wing.speed = 2.5
-O.Wing.maxspeed = 100
-O.Wing.torque = math.rad(1.3)
-O.Wing.maxtorque = math.rad(100)
+O.Wing.speed = 6
+O.Wing.maxspeed = 160
+O.Wing.torque = math.rad(4)
+O.Wing.maxtorque = math.rad(160)
+O.Wing.damage = 3
 O.Wing.hp = 5
 -- cmp
 O.Wing.shot=cmp.shot
@@ -248,7 +253,7 @@ function O.Wing:update(dt)
                           -math.abs(self.dx+self.dy)/2)
         self.wounded3.particle:emit(1)
     end
-
+    self:linearDamping(dt/2)
     self:stop_rotate(dt)
 end
 
@@ -256,13 +261,13 @@ end
 O.Bullet = cls.Class(O.Base,{tag='bullet',collider={'left'}})
 -- const
 O.Bullet.imgdata = set.IMG[O.Bullet.tag]
-O.Bullet.speed = 600
-O.Bullet.maxspeed = 1200
-O.Bullet.cooldown = 0.1
-O.Bullet.lifetime = 1
+O.Bullet.speed = 950
+O.Bullet.maxspeed = 8000
+O.Bullet.cooldown = 0.07
+O.Bullet.lifetime = 0.7
 O.Bullet.damage = 1
-O.Bullet.kick = -10
-O.Bullet.mistake = 45
+O.Bullet.kick = -7
+O.Bullet.mistake = 80
 --cmp
 O.Bullet.borders = cmp.outScreen
 function O.Bullet:new(o)
@@ -302,16 +307,17 @@ function O.Bullet:destroy()
 end
 
 
-O.Rocket = cls.Class(O.Base,{tag='rocket',collider='rectangle'})
+O.Rocket = cls.Class(O.Base,{tag='rocket',collider='rectangle',born=true})
 -- const
 O.Rocket.imgdata = set.IMG[O.Rocket.tag]
-O.Rocket.speed = 5
-O.Rocket.maxspeed = 500
-O.Rocket.cooldown = 0.7
-O.Rocket.lifetime = 2.5
+O.Rocket.speed = 120
+O.Rocket.maxspeed = 1000
+O.Rocket.cooldown = 0.35
+O.Rocket.lifetime = 0.7
 O.Rocket.damage = 3
 O.Rocket.kick = -40
-O.Rocket.mistake = 4
+O.Rocket.mistake = 5
+O.Rocket.hp = 3
 function O.Rocket:new(o)
     self.node=Model
     self:setObject(self.imgdata)
@@ -325,8 +331,10 @@ function O.Rocket:new(o)
 
     self:boom(self.rect.left[1], self.rect.left[2], 60, {8,6,4},
                             {set.WHITE,set.GRAY,set.GRAYF})
-    set.AUD['rocket']:stop()
-    set.AUD['rocket']:play()
+    if self.born then
+        set.AUD['rocket']:stop()
+        set.AUD['rocket']:play()
+    end
 
     self.node:spawn(self)
 end
@@ -357,8 +365,18 @@ function O.Rocket:destroy()
     self:destroyParticle({2,4}, {1,2.5}, 300)
     set.AUD['rocketdestroy']:stop()
     set.AUD['rocketdestroy']:play()
+    if self.born then
+        local ang = {-0.4,0,0.4}
+        for i=1,3 do
+            O.Rocket{node=self.node,x=self.x,y=self.y,
+                    dx=0,dy=0, angle=self.angle+ang[i],da=0,
+                    scale=self.scale/2, lifetime=O.Rocket.lifetime/2,
+                    born=false,hp=1}
+        end
+    end
 
     for particle in pairs(self.particles) do particle:reset() end
+    self.particle = {}
     self.node:destroy(self)
 end
 

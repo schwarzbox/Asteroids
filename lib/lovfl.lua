@@ -44,7 +44,10 @@ function FL.loadAll(dir,...)
 
     local files = lovfs.getDirectoryItems(dir)
     for i=1,#files do
-        local path = dir .. '/' .. files[i]
+        local path = files[i]
+        if #dir>0 then
+            path = dir..'/'..files[i]
+        end
         local base = FL.base(path)
         exist = lovfs.getInfo(path)
         if (exist and exist.type=='file' and FL.isExt(path,...)) then
@@ -66,7 +69,10 @@ function FL.removeAll(dir,rmdir)
         if exist and exist.type=='directory' then
             local files = lovfs.getDirectoryItems(item)
             for i=1,#files do
-                local path = dir .. '/' .. files[i]
+                local path = files[i]
+                if #dir>0 then
+                    path = dir..'/'..files[i]
+                end
                 remove(path,true)
                 lovfs.remove(path)
             end
@@ -103,6 +109,10 @@ function FL.base(path)
     return path:match('([^/]+)[%.]')
 end
 
+function FL.noext(path)
+    return path:match('([^.]+)[%.]')
+end
+
 function FL.ext(path)
     return path:match('[^.]+$')
 end
@@ -124,7 +134,10 @@ function FL.tree(dir,arr,verbose)
     local files = lovfs.getDirectoryItems(dir)
     if verbose then print('dir', dir) end
     for i=1, #files do
-        local path = dir..'/'..files[i]
+        local path = files[i]
+        if #dir>0 then
+            path = dir..'/'..files[i]
+        end
         if lovfs.getInfo(path).type=='file' then
             arr[#arr+1] = path
             if verbose then print(#arr,path) end

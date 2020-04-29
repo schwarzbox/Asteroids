@@ -28,7 +28,7 @@
 -- 4.0
 -- Make handle pan (fold button) fof HBox VBox to drag item.
 
--- slider float
+-- slider float negative
 -- Add drag event for ProgBar (semi transparent box with values)
 
 -- FoldList and List self.sel last added
@@ -1190,7 +1190,7 @@ function UI.Slider:setValue()
     if self.var.val+(newx-oldx)<self.min then return end
     self.var.val = self.var.val+(newx-oldx)
     -- fix mouse
-    love.mouse.setPosition(newx+halfbarwid,self.bar:get('y'))
+    -- love.mouse.setPosition(newx+halfbarwid,self.bar:get('y'))
     self.bar:set({x=newx})
 
     self:com()
