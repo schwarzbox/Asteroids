@@ -157,7 +157,6 @@ end
 
 function FL.saveFile(path,datastr)
     local file = io.open(path,'w')
-
     file:write(datastr)
     file:close()
 end
@@ -174,12 +173,19 @@ function FL.copyFile(path,dir)
     FL.saveFile(newpath,datastr)
 end
 
-function FL.loadLove(path)
+function FL.loadLove(path,...)
     local chunk, err = lovfs.load(path)
-    if not err then return chunk() end
+    if not err then return chunk(...) end
 end
 
-function FL.saveLove(path,datastr,open)
+function FL.loadLoveFile(path)
+    local file = lovfs.newFile(path,'r')
+    local content = file:read()
+    file:close()
+    return content
+end
+
+function FL.saveLoveFile(path,datastr,open)
     local file = lovfs.newFile(path,'w')
     file:write(datastr)
     file:close()

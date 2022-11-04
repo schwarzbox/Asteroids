@@ -158,7 +158,7 @@ function Model:update(dt)
 
     -- game
     if View:get_scr()=='game_scr' then
-        if self.pause then return end
+        -- if self.pause then return end
 
         -- clouds
         self.fog.particle:setEmissionRate(love.math.random(1,2))
@@ -236,7 +236,7 @@ function Model:endgame()
         if olddata[1]>data[1] then data[1] = olddata[1] end
         if olddata[2]>data[2] then data[2] = olddata[2] end
     end
-    fl.saveLove(set.SAVE,string.format('return {%i,%i}',data[1],data[2]))
+    fl.saveLoveFile(set.SAVE,string.format('return {%i,%i}',data[1],data[2]))
     self.maxlevel, self.maxscore = data[1],data[2]
     self.lastscore = self.score
     self:reset()

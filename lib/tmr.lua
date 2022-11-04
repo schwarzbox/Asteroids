@@ -122,7 +122,7 @@ function Ease.inOutExpo(elapsed,st,diff,time)
     if elapsed<1 then
         return diff/2*math.pow(2, 10*(elapsed-1))+st-diff * 0.0005
     else
-    elapsed = elapsed-1
+        elapsed = elapsed-1
     return diff/2*1.0005*(-math.pow(2, -10*elapsed)+2)+ st
     end
 end
@@ -159,11 +159,11 @@ function Ease.inOutBack(elapsed,st,diff,time,step)
   end
 end
 
-function Ease.outInBack(elapsed,st,diff,time,s)
+function Ease.outInBack(elapsed,st,diff,time,step)
   if elapsed<time/2 then
-    return Ease.outBack(elapsed*2, st, diff/2, time, s)
+    return Ease.outBack(elapsed*2, st, diff/2, time, step)
   else
-    return Ease.inBack((elapsed*2)-time, st+diff/2, diff/2, time, s)
+    return Ease.inBack((elapsed*2)-time, st+diff/2, diff/2, time, step)
   end
 end
 
@@ -322,8 +322,10 @@ function TMR:tween(time,init,fin,ease,after,key)
     local diff = {}
     for k,v in pairs(fin) do diff[k] = v-st[k] end
 
-    local timer = {elapsed=0, time=time, st=st,diff=diff, delta=init,
-                                        ease=ease,after=after, key=key}
+    local timer = {
+        elapsed=0, time=time, st=st, diff=diff, delta=init,
+        ease=ease, after=after, key=key
+    }
     TMR.delete(self, self.tweentmr, key)
     self.tweentmr[timer] = timer
     return timer

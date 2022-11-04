@@ -65,7 +65,7 @@ function love.load()
     Ctrl:bind('left','arr_left_stop')
     -- ctrl game
     Ctrl:bind('space','start',function() Model:startgame() end)
-    Ctrl:bind('escape','pause', function() Model:set_pause() end)
+    -- Ctrl:bind('escape','pause', function() Model:set_pause() end)
     Ctrl:bind('lgui+r','cmdr',function() love.event.quit('restart') end)
     Ctrl:bind('lgui+q','cmdq', function() love.event.quit(1) end)
 end

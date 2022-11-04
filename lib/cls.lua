@@ -50,7 +50,7 @@ function id()
     return ('100000100001-1000-0000'):gsub('[01]',func)
 end
 
-function CLS.Class(Super,class)
+function CLS.Class(Super, class)
     Super = Super or {}
     class = class or {}
     class.Super = Super
@@ -61,9 +61,10 @@ function CLS.Class(Super,class)
                     self.total = self.total + 1
                     o = o or {}
                     -- o.id = id()
-                    o.id = self
+                    -- o.id = o
                     self.__index = self
                     self = setmetatable(o, self)
+
                     if self.new then self.new(self, o) end
                     return self
                 end
