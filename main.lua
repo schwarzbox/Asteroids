@@ -5,7 +5,7 @@
 -- main.lua
 
 -- MIT License
--- Copyright (c) 2018 Alexander Veledzimovich veledz@gmail.com
+-- Copyright (c) 2018 Aliaksandr Veledzimovich veledz@gmail.com
 
 -- Permission is hereby granted, free of charge, to any person obtaining a
 -- copy of this software and associated documentation files (the "Software"),
@@ -27,9 +27,6 @@
 
 -- Music by Eric Matyas
 -- www.soundimage.org
-
--- 3.5
--- bonuses
 
 local imd = require('lib/lovimd')
 
@@ -68,14 +65,13 @@ function love.load()
     -- Ctrl:bind('escape','pause', function() Model:set_pause() end)
     Ctrl:bind('lgui+r','cmdr',function() love.event.quit('restart') end)
     Ctrl:bind('lgui+q','cmdq', function() love.event.quit(1) end)
+
+    local upd_title = string.format('%s %s', set.APPNAME, set.VER)
+    love.window.setTitle(upd_title)
 end
 
 -- dt around 0.016618420952
 function love.update(dt)
-
-    local upd_title = string.format('%s %s', set.APPNAME, set.VER)
-    love.window.setTitle(upd_title)
-
     -- update model
     Model:update(dt)
     -- ctrl ship

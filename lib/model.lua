@@ -1,5 +1,5 @@
 -- Sun May 13 23:35:21 2018
--- (c) Alexander Veledzimovich
+-- (c) Aliaksandr Veledzimovich
 -- model ASTEROIDS
 
 local Tmr = require('lib/tmr')
@@ -63,10 +63,10 @@ function Model:reset()
     self.fin = false
     -- menu&game particles
     self.dust=self:objectParticle(7, {set.WHITEFF,set.ORANGE,set.DARKGRAYF},
-                                     'circle', {1,5}, {0.1,0.6},15)
+                                     'circle', {5,10}, {0.1,0.6},25)
 
     self.grdust=self:objectParticle(11, {set.WHITEFF,set.LIGHTGRAY,set.GRAYF},
-                                     'circle', {5,10}, {0.1,0.4},10)
+                                     'circle', {5,15}, {0.1,0.4},15)
     -- menu music
     set.AUD['intro']:setLooping(true)
     set.AUD['intro']:play()

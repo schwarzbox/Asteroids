@@ -1,5 +1,5 @@
 -- Sun May 13 23:35:21 2018
--- (c) Alexander Veledzimovich
+-- (c) Aliaksandr Veledzimovich
 -- obj ASTEROIDS
 
 local imd = require('lib/lovimd')

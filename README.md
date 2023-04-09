@@ -4,18 +4,24 @@ v3.0
 
 "Asteroids" is a well known Shoot Them All game.
 
-Goal: Destroy all asteroids.
+Destroy all asteroids.
 
-Controls: 'W' - forward, 'A' - rotate right, 'D' - rotate left, 'SPACE' - fire.
+No tutorials. No bonuses. No fullscreen.
 
-Made with Love2d and some self-made libraries on top of Love Engine.
+HINT: 'W' - forward, 'A' - rotate right, 'D' - rotate left, 'SPACE' - fire.
 
-Music by [Eric Matyas](https://soundimage.org)
+Made with LÖVE and some self-made libraries on top of the engine.
 
-[Release available for Mac OS 64-bit & for Windows 32-bit](https://github.com/schwarzbox/Asteroids/releases)
+[Release available for MacOS-arm64, MacOS-x86, Windows-64bit & Windows-32bit](https://github.com/schwarzbox/Asteroids/releases)
 
-To run source code: clone repository, download & install [LÖVE 11.3](https://love2d.org) for you system and run asteroids.love
+To run source code: clone repository, download & install [LÖVE 11.4](https://love2d.org) for your system.
+
+Engine: [LÖVE Development Team](https://love2d.org/)
+
+Design/Art/Code: [Aliaksandr Veledzimovich](https://twitter.com/veledzimovich)
+
+Music: [Eric Matyas](https://soundimage.org)
 
 ![Screenshot](screenshot/screenshot1.png)
 ![Screenshot](screenshot/screenshot2.png)
-![Screenshot](screenshot/screenshot3.png)
+![Screenshot](screenshot/screenshot4.png)
